@@ -22,9 +22,14 @@ void main() {
 
   testWidgets('SplashScreen stays visible and does not navigate',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('MedScarrier'), findsOneWidget);
     expect(find.byType(SplashScreen), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 5));
