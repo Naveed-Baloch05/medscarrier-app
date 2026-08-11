@@ -37,4 +37,33 @@ void main() {
     expect(find.byType(SplashScreen), findsOneWidget);
     expect(find.byType(HomeScreen), findsNothing);
   });
+
+  testWidgets('SplashScreen is responsive across Android screen sizes',
+      (WidgetTester tester) async {
+    // Portrait phone sizes in logical pixels for common Android devices
+    const sizes = <Size>[
+      Size(320, 568), // small phone
+      Size(360, 640), // small Android
+      Size(360, 800), // common Android
+      Size(412, 915), // large phone
+      Size(600, 960), // small tablet
+      Size(800, 1280), // tablet
+    ];
+
+    for (final size in sizes) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(SplashScreen), findsOneWidget,
+          reason: 'Splash overflowed or failed to build at $size');
+
+      // Let the SplashBloc timer finish before disposing the tree
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
 }

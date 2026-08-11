@@ -53,7 +53,10 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
+    final shortestSide = screenSize.shortestSide;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandFontSize = (shortestSide * 0.088).clamp(24.0, 40.0);
+    final logoHeight = (shortestSide * 0.21).clamp(54.0, 110.0);
 
     return BlocProvider(
       create: (context) => SplashBloc()..add(AppStarted()),
@@ -94,20 +97,25 @@ class _SplashScreenState extends State<SplashScreen>
                         const SizedBox(height: 12),
 
                         // Brand Header Section
-                        _buildBrandHeader(isDark),
+                        _buildBrandHeader(isDark, brandFontSize, logoHeight),
 
-                        // Rider Center Section
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenSize.width * 0.1,
-                          ),
-                          child: AspectRatio(
-                            aspectRatio: 1.1,
-                            child: Image.asset(
-                              'assets/images/rider_scooter.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _buildRiderPlaceholder(),
+                        // Rider Center Section - flexes & capped on large screens
+                        Flexible(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: 420,
+                                maxHeight: 420,
+                              ),
+                              child: AspectRatio(
+                                aspectRatio: 1.1,
+                                child: Image.asset(
+                                  'assets/images/rider_scooter.png',
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      _buildRiderPlaceholder(),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -166,12 +174,12 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   /// Logo, App Title & Pulse Graphic
-  Widget _buildBrandHeader(bool isDark) {
+  Widget _buildBrandHeader(bool isDark, double fontSize, double logoHeight) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 70,
+          height: logoHeight,
           child: Image.asset(
             'assets/images/logo.png',
             fit: BoxFit.contain,
@@ -183,7 +191,7 @@ class _SplashScreenState extends State<SplashScreen>
         Text(
           'MedScarrier',
           style: TextStyle(
-            fontSize: 32,
+            fontSize: fontSize,
             fontWeight: FontWeight.w800,
             color: isDark ? Colors.white : SplashScreen.darkTeal,
             letterSpacing: -0.5,
