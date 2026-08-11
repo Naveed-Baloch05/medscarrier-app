@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/splash_bloc.dart';
+import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -63,9 +64,9 @@ class _SplashScreenState extends State<SplashScreen>
       child: BlocListener<SplashBloc, SplashState>(
         listener: (context, state) {
           if (state is SplashNavigated) {
-            // Navigator.of(context).pushReplacement(
-            //   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-            // );
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+            );
           }
         },
         child: Scaffold(

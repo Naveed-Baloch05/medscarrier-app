@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:medscarrier/screens/login_screen.dart';
+import 'package:medscarrier/screens/signup_screen.dart';
 import 'package:medscarrier/screens/splash_screen.dart';
 import 'package:medscarrier/screens/welcome_screen.dart';
 
@@ -8,12 +10,15 @@ void main() {
   testWidgets('WelcomeScreen renders', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
 
-    expect(find.text('Fitness Is\nImportant\nAs More'), findsOneWidget);
+    expect(
+      find.text('Fast, Smart  MadScarrier.\nYour Pharmacy, Delivered to You'),
+      findsOneWidget,
+    );
     expect(find.text('Signup'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
   });
 
-  testWidgets('WelcomeScreen Signup button dispatches bloc event',
+  testWidgets('WelcomeScreen Signup button navigates to SignupScreen',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3.0;
@@ -22,13 +27,12 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
 
     await tester.tap(find.text('Signup'));
-    await tester.pump();
-    expect(find.text('Navigating to Signup...'), findsOneWidget);
-
     await tester.pumpAndSettle();
+
+    expect(find.byType(SignupScreen), findsOneWidget);
   });
 
-  testWidgets('WelcomeScreen Login button dispatches bloc event',
+  testWidgets('WelcomeScreen Login button navigates to LoginScreen',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3.0;
@@ -37,13 +41,12 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
 
     await tester.tap(find.text('Login'));
-    await tester.pump();
-    expect(find.text('Navigating to Login...'), findsOneWidget);
-
     await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('SplashScreen stays visible and does not navigate',
+  testWidgets('SplashScreen navigates to WelcomeScreen via bloc',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 1920);
     tester.view.devicePixelRatio = 3.0;
@@ -55,10 +58,11 @@ void main() {
     expect(find.text('MedScarrier'), findsOneWidget);
     expect(find.byType(SplashScreen), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
 
-    expect(find.byType(SplashScreen), findsOneWidget);
-    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(find.byType(SplashScreen), findsNothing);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
   });
 
   testWidgets('SplashScreen is responsive across Android screen sizes',

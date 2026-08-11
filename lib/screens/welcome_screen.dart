@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/welcome_bloc.dart';
 import '../bloc/welcome_event.dart';
 import '../bloc/welcome_state.dart';
+import 'login_screen.dart';
+import 'signup_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -15,142 +17,143 @@ class WelcomeScreen extends StatelessWidget {
         body: BlocListener<WelcomeBloc, WelcomeState>(
           listener: (context, state) {
             if (state is NavigateToSignupState) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Navigating to Signup...')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SignupScreen()),
               );
             } else if (state is NavigateToLoginState) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Navigating to Login...')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
             }
           },
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              // 1. Fullscreen Background City Image
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/images/city_background.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: const Color(0xFF00584B),
-                    child: const Center(
-                      child: Icon(
-                        Icons.location_city_rounded,
-                        size: 120,
-                        color: Colors.white38,
-                      ),
+              // 1. Full Screen Background Image
+              Image.asset(
+                'assets/images/3rd image.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF0D534D), Color(0xFF00968A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                ),
-              ),
-
-              // 2. Headline Overlay Text
-              Positioned(
-                top: 80,
-                left: 24,
-                right: 24,
-                child: Text(
-                  'Fitness Is\nImportant\nAs More',
-                  style: TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1.1,
-                    shadows: [
-                      Shadow(
-                        offset: const Offset(0, 2),
-                        blurRadius: 6.0,
-                        color: Colors.black.withValues(alpha: 0.3),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 3. Rider Asset Placed in the Center
-              Align(
-                alignment: Alignment.center,
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    top: 100.0, // Adjust offset as needed
-                  ),
-                  child: Image.asset(
-                    'assets/images/rider.png',
-                    width: MediaQuery.of(context).size.width * 0.75,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Icon(
+                  child: const Center(
+                    child: Icon(
                       Icons.delivery_dining_rounded,
-                      size: 140,
+                      size: 120,
                       color: Colors.white,
                     ),
                   ),
                 ),
               ),
 
-              // 4. Bottom Action Buttons (Signup & Login)
+              // 2. Dark Gradient Overlay at Top for High Text Contrast
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.center,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.45),
+                        Colors.black.withValues(alpha: 0.10),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. Top Heading Text ("Fitness Is Important As More")
               Positioned(
-                bottom: 40,
+                top: MediaQuery.of(context).padding.top + 30,
+                left: 28,
+                right: 28,
+                child: const Text(
+                  'A Smarter Way to Get Your Prescriptions.',
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1.3,
+                    letterSpacing: -0.5,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 12,
+                        color: Colors.black45,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 4. Bottom Action Buttons (Signup & Login floating over background)
+              Positioned(
+                bottom: MediaQuery.of(context).padding.bottom + 16,
                 left: 20,
                 right: 20,
-                child: Builder(
-                  builder: (blocContext) {
+                child: BlocBuilder<WelcomeBloc, WelcomeState>(
+                  builder: (context, state) {
                     return Row(
                       children: [
-                        // Signup Button
+                        // Signup Button (Dark/Black)
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              blocContext
-                                  .read<WelcomeBloc>()
-                                  .add(SignupButtonPressed());
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 18,
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Signup',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                              onPressed: () {
+                                BlocProvider.of<WelcomeBloc>(context)
+                                    .add(SignupButtonPressed());
+                              },
+                              child: const Text(
+                                'Signup',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
-
-                        // Login Button
+                        const SizedBox(width: 14),
+                        // Login Button (White)
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              blocContext
-                                  .read<WelcomeBloc>()
-                                  .add(LoginButtonPressed());
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 18,
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                              onPressed: () {
+                                BlocProvider.of<WelcomeBloc>(context)
+                                    .add(LoginButtonPressed());
+                              },
+                              child: const Text(
+                                'Login',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
                               ),
                             ),
                           ),
