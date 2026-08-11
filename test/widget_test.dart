@@ -8,9 +8,7 @@ void main() {
   testWidgets('WelcomeScreen renders', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
 
-    expect(find.text('MedScarrier'), findsOneWidget);
-    expect(find.text('Medicines Delivered,'), findsOneWidget);
-    expect(find.text('Care Delivered.'), findsOneWidget);
+    expect(find.text('Fitness Is\nImportant\nAs More'), findsOneWidget);
     expect(find.text('Signup'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
   });

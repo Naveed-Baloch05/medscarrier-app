@@ -1,26 +1,14 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'welcome_event.dart';
+import 'welcome_state.dart';
 
 class WelcomeBloc extends Bloc<WelcomeEvent, WelcomeState> {
-  WelcomeBloc() : super(WelcomeInitial()) {
-    on<SignupPressed>((event, emit) {
-      emit(NavigateToSignup());
+  WelcomeBloc() : super(WelcomeInitialState()) {
+    on<SignupButtonPressed>((event, emit) {
+      emit(NavigateToSignupState());
     });
-    on<LoginPressed>((event, emit) {
-      emit(NavigateToLogin());
+    on<LoginButtonPressed>((event, emit) {
+      emit(NavigateToLoginState());
     });
   }
 }
-
-abstract class WelcomeEvent {}
-
-class SignupPressed extends WelcomeEvent {}
-
-class LoginPressed extends WelcomeEvent {}
-
-abstract class WelcomeState {}
-
-class WelcomeInitial extends WelcomeState {}
-
-class NavigateToSignup extends WelcomeState {}
-
-class NavigateToLogin extends WelcomeState {}
