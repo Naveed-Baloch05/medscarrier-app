@@ -12,6 +12,7 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const MyApp());
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -22,8 +23,8 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: AppConstants.appName,
         theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
+        // Hamesha Light theme force karne ke liye themeMode light set kar diya hai
+        themeMode: ThemeMode.light,
         debugShowCheckedModeBanner: false,
         home: const SplashScreen(),
       ),
