@@ -225,15 +225,16 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  /// Modern active progress pill bar
+  /// Static fully-filled progress bar
   Widget _buildAnimatedProgressBar() {
     return SizedBox(
       width: 72,
       height: 4,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: LinearProgressIndicator(
-          backgroundColor: const Color(0xFFE2E8E8),
+        child: const LinearProgressIndicator(
+          value: 1.0,
+          backgroundColor: Color(0xFFE2E8E8),
           valueColor: AlwaysStoppedAnimation<Color>(SplashScreen.primaryTeal),
         ),
       ),
