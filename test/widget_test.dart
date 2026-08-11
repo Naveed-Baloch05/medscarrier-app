@@ -1,23 +1,48 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:medscarrier/bloc/splash_bloc.dart';
-import 'package:medscarrier/screens/home_screen.dart';
 import 'package:medscarrier/screens/splash_screen.dart';
+import 'package:medscarrier/screens/welcome_screen.dart';
 
 void main() {
-  testWidgets('HomeScreen renders', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      BlocProvider(
-        create: (context) => SplashBloc(),
-        child: const MaterialApp(home: HomeScreen()),
-      ),
-    );
+  testWidgets('WelcomeScreen renders', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
 
-    expect(find.text('MedsCarrier'), findsOneWidget);
-    expect(find.text('Welcome to MedsCarrier'), findsOneWidget);
-    expect(find.text('Flutter BLoC Project'), findsOneWidget);
+    expect(find.text('MedScarrier'), findsOneWidget);
+    expect(find.text('Medicines Delivered,'), findsOneWidget);
+    expect(find.text('Care Delivered.'), findsOneWidget);
+    expect(find.text('Signup'), findsOneWidget);
+    expect(find.text('Login'), findsOneWidget);
+  });
+
+  testWidgets('WelcomeScreen Signup button dispatches bloc event',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
+
+    await tester.tap(find.text('Signup'));
+    await tester.pump();
+    expect(find.text('Navigating to Signup...'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('WelcomeScreen Login button dispatches bloc event',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
+
+    await tester.tap(find.text('Login'));
+    await tester.pump();
+    expect(find.text('Navigating to Login...'), findsOneWidget);
+
+    await tester.pumpAndSettle();
   });
 
   testWidgets('SplashScreen stays visible and does not navigate',
@@ -35,7 +60,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
 
     expect(find.byType(SplashScreen), findsOneWidget);
-    expect(find.byType(HomeScreen), findsNothing);
+    expect(find.byType(WelcomeScreen), findsNothing);
   });
 
   testWidgets('SplashScreen is responsive across Android screen sizes',
@@ -61,8 +86,10 @@ void main() {
       expect(find.byType(SplashScreen), findsOneWidget,
           reason: 'Splash overflowed or failed to build at $size');
 
-      // Let the SplashBloc timer finish before disposing the tree
+      // Let the SplashBloc timer finish (and navigation settle) before
+      // disposing the tree
       await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
     }
   });

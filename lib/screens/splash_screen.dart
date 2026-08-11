@@ -63,7 +63,9 @@ class _SplashScreenState extends State<SplashScreen>
       child: BlocListener<SplashBloc, SplashState>(
         listener: (context, state) {
           if (state is SplashNavigated) {
-            // Navigator.of(context).pushReplacementNamed('/home');
+            // Navigator.of(context).pushReplacement(
+            //   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+            // );
           }
         },
         child: Scaffold(
