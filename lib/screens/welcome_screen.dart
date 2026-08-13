@@ -5,7 +5,6 @@ import '../bloc/welcome_event.dart';
 import '../bloc/welcome_state.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
-
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -68,28 +67,23 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // 3. Top Heading Text ("Fitness Is Important As More")
+              // 3. Header Text matching the target design
+              // 3. Header Text positioned directly above the rider
+              // 3. Header Text matching the target design
               Positioned(
-                top: MediaQuery.of(context).padding.top + 30,
-                left: 28,
-                right: 28,
+                top: MediaQuery.of(context).padding.top + 36,
+                left: 24,
+                right: 24,
                 child: const Text(
-                  'A Smarter Way to Get Your Prescriptions.',
+                  'A Smarter Way\nto Get Your\nPrescriptions.',
                   textAlign: TextAlign.left,
                   style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    height: 1.3,
-                    letterSpacing: -0.5,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 12,
-                        color: Colors.black45,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
+                    fontSize: 44,
+                    fontWeight: FontWeight.bold,
+                    // Translucent/off-white color from the mockup
+                    color: Color(0xD8FFFFFF), // ~85% opacity white
+                    height: 1.05,             // Tight line height
+                    letterSpacing: -1.0,       // Tight character spacing
                   ),
                 ),
               ),
