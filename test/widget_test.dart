@@ -11,7 +11,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
 
     expect(
-      find.text('Fast, Smart  MadScarrier.\nYour Pharmacy, Delivered to You'),
+      find.text('A Smarter Way\nto Get Your\nPrescriptions.'),
       findsOneWidget,
     );
     expect(find.text('Signup'), findsOneWidget);
@@ -44,6 +44,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets('SignupScreen is responsive across Android screen sizes',
+      (WidgetTester tester) async {
+    const sizes = <Size>[
+      Size(320, 568), // small phone
+      Size(360, 640), // small Android
+      Size(360, 800), // common Android
+      Size(412, 915), // large phone
+      Size(600, 960), // small tablet
+      Size(800, 1280), // tablet
+    ];
+
+    for (final size in sizes) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const MaterialApp(home: SignupScreen()));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(SignupScreen), findsOneWidget,
+          reason: 'SignupScreen overflowed or failed to build at $size');
+
+      await tester.pumpWidget(const SizedBox());
+    }
   });
 
   testWidgets('SplashScreen navigates to WelcomeScreen via bloc',
