@@ -2,6 +2,10 @@ abstract class AuthEvent {
   const AuthEvent();
 }
 
+// =========================
+// Sign Up
+// =========================
+
 class SignUpRequested extends AuthEvent {
   const SignUpRequested({
     required this.email,
@@ -11,6 +15,10 @@ class SignUpRequested extends AuthEvent {
   final String email;
   final String password;
 }
+
+// =========================
+// Log In
+// =========================
 
 class LogInRequested extends AuthEvent {
   const LogInRequested({
@@ -22,4 +30,18 @@ class LogInRequested extends AuthEvent {
   final String password;
 }
 
-class LogOutRequested extends AuthEvent {}
+// =========================
+// Log Out
+// =========================
+
+class LogOutRequested extends AuthEvent {
+  const LogOutRequested();
+}
+
+// =========================
+// Check Authentication
+// =========================
+
+class CheckAuthRequested extends AuthEvent {
+  const CheckAuthRequested();
+}

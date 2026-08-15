@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/auth/auth_bloc.dart';
+import '../bloc/auth/auth_event.dart';
+import '../bloc/auth/auth_state.dart';
+import 'free_trial_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -30,22 +35,12 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit(BuildContext context) {
     if (_formKey.currentState?.validate() ?? false) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Account created successfully!'),
-            ],
-          ),
-          backgroundColor: SignupScreen.darkTeal,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+      BlocProvider.of<AuthBloc>(context).add(
+        SignUpRequested(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
         ),
       );
     }
@@ -53,64 +48,96 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider<AuthBloc>(
+      create: (context) => AuthBloc(),
+      child: Builder(
+        builder: (context) => _buildContent(context),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isWide = size.width > 600;
     final scale = (size.shortestSide / 420).clamp(0.85, 1.1);
 
     return Scaffold(
       backgroundColor: SignupScreen.background,
-      body: Stack(
-        children: [
-          // Background ambient decoration circles
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: SignupScreen.primaryTeal.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -80,
-            left: -80,
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: SignupScreen.accentTeal.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-
-          // Main Scrollable Content
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isWide ? 40 : 24,
-                  vertical: 24,
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is Authenticated) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FreeTrialScreen(
+                  userId: state.user.uid,
+                  email: state.user.email ?? _emailController.text.trim(),
                 ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 440),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHeader(scale),
-                      SizedBox(height: 28 * scale),
-                      _buildFormCard(scale),
-                    ],
+              ),
+            );
+          } else if (state is AuthError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red.shade700,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+          }
+        },
+        child: Stack(
+          children: [
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: SignupScreen.primaryTeal.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -80,
+              left: -80,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: SignupScreen.accentTeal.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isWide ? 40 : 24,
+                    vertical: 24,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(scale),
+                        SizedBox(height: 28 * scale),
+                        _buildFormCard(context, scale),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -173,7 +200,7 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  Widget _buildFormCard(double scale) {
+  Widget _buildFormCard(BuildContext context, double scale) {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: 24,
@@ -247,7 +274,7 @@ class _SignupScreenState extends State<SignupScreen> {
               icon: Icons.lock_reset_rounded,
               obscureText: _obscureConfirmPassword,
               textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
+              onFieldSubmitted: (_) => _submit(context),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureConfirmPassword
@@ -270,27 +297,41 @@ class _SignupScreenState extends State<SignupScreen> {
               },
             ),
             SizedBox(height: 28 * scale),
-            SizedBox(
-              height: 52 * scale,
-              child: ElevatedButton(
-                onPressed: _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: SignupScreen.primaryTeal,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, state) {
+                final isLoading = state is AuthLoading;
+                return SizedBox(
+                  height: 52 * scale,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : () => _submit(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SignupScreen.primaryTeal,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                        : const Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Sign Up',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
