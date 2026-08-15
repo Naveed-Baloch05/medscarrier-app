@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:medscarrier/widgets/home_content.dart';
 import 'package:medscarrier/screens/free_trial_screen.dart';
 import 'package:medscarrier/screens/login_screen.dart';
 import 'package:medscarrier/screens/signup_screen.dart';
@@ -96,6 +97,46 @@ void main() {
 
       expect(find.byType(FreeTrialScreen), findsOneWidget,
           reason: 'FreeTrialScreen overflowed or failed to build at $size');
+
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  testWidgets('HomeScreen content is responsive across Android screen sizes',
+      (WidgetTester tester) async {
+    const sizes = <Size>[
+      Size(320, 568), // small phone
+      Size(360, 640), // small Android
+      Size(360, 800), // common Android
+      Size(412, 915), // large phone
+      Size(600, 960), // small tablet
+      Size(800, 1280), // tablet
+    ];
+
+    for (final size in sizes) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      // Active trial state
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: HomeContent(remainingDays: 6)),
+      ));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(HomeContent), findsOneWidget,
+          reason: 'Active HomeContent overflowed or failed to build at $size');
+
+      await tester.pumpWidget(const SizedBox());
+
+      // Expired trial state
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: HomeContent(expired: true)),
+      ));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(HomeContent), findsOneWidget,
+          reason: 'Expired HomeContent overflowed or failed to build at $size');
 
       await tester.pumpWidget(const SizedBox());
     }
