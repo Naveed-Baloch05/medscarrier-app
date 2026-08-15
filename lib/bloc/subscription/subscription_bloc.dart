@@ -1,35 +1,77 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../core/services/subscription_service.dart';
+import '../../models/subscription_model.dart';
 import 'subscription_event.dart';
 import 'subscription_state.dart';
 
-class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
-  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
-
-  SubscriptionBloc() : super(SubscriptionInitial()) {
+class SubscriptionBloc
+    extends Bloc<SubscriptionEvent, SubscriptionState> {
+  SubscriptionBloc() : super(const SubscriptionInitial()) {
     on<StartTrialEvent>(_onStartTrial);
+    on<CheckSubscriptionEvent>(_onCheckSubscription);
   }
 
+  // =========================
+  // Start Free Trial
+  // =========================
   Future<void> _onStartTrial(
-    StartTrialEvent event,
-    Emitter<SubscriptionState> emit,
-  ) async {
-    emit(SubscriptionLoading());
+      StartTrialEvent event,
+      Emitter<SubscriptionState> emit,
+      ) async {
+    emit(const SubscriptionLoading());
+
     try {
-      final now = DateTime.now();
-      final endDate = now.add(const Duration(days: 14));
+      await SubscriptionService.instance.startFreeTrial(
+        userId: event.userId,
+        email: event.email,
+      );
 
-      await _firestore.collection('users').doc(event.userId).set({
-        'email': event.email,
-        'plan': 'trial',
-        'status': 'active',
-        'trialStartDate': Timestamp.fromDate(now),
-        'trialEndDate': Timestamp.fromDate(endDate),
-      }, SetOptions(merge: true));
-
-      emit(SubscriptionSuccess());
+      emit(const SubscriptionSuccess());
     } catch (e) {
-      emit(SubscriptionFailure(e.toString()));
+      emit(
+        SubscriptionFailure(
+          _errorMessage(e),
+        ),
+      );
     }
+  }
+
+  // =========================
+  // Check Subscription
+  // =========================
+  Future<void> _onCheckSubscription(
+      CheckSubscriptionEvent event,
+      Emitter<SubscriptionState> emit,
+      ) async {
+    emit(const SubscriptionLoading());
+
+    try {
+      final SubscriptionModel? subscription =
+      await SubscriptionService.instance.getSubscription(
+        event.userId,
+      );
+
+      if (subscription == null) {
+        emit(const SubscriptionNotFound());
+        return;
+      }
+
+      if (subscription.isTrialActive) {
+        emit(SubscriptionActive(subscription));
+      } else {
+        emit(SubscriptionExpired(subscription));
+      }
+    } catch (e) {
+      emit(
+        SubscriptionFailure(
+          _errorMessage(e),
+        ),
+      );
+    }
+  }
+
+  String _errorMessage(Object error) {
+    return 'Unable to process your subscription. Please try again.';
   }
 }
