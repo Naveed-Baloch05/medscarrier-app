@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'splash_event.dart';
+import 'splash_state.dart';
 
 class SplashBloc extends Bloc<SplashEvent, SplashState> {
   SplashBloc() : super(SplashInitial()) {
@@ -9,13 +11,3 @@ class SplashBloc extends Bloc<SplashEvent, SplashState> {
     });
   }
 }
-
-abstract class SplashEvent {}
-
-class AppStarted extends SplashEvent {}
-
-abstract class SplashState {}
-
-class SplashInitial extends SplashState {}
-
-class SplashNavigated extends SplashState {}

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/splash_bloc.dart';
+import '../bloc/splash/splash_bloc.dart';
+import '../bloc/splash/splash_event.dart';
+import '../bloc/splash/splash_state.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/welcome_bloc.dart';
-import '../bloc/welcome_event.dart';
-import '../bloc/welcome_state.dart';
+import '../bloc/welcome/welcome_bloc.dart';
+import '../bloc/welcome/welcome_event.dart';
+import '../bloc/welcome/welcome_state.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 class WelcomeScreen extends StatelessWidget {
