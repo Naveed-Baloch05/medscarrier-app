@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../bloc/subscription/subscription_bloc.dart';
 import '../bloc/subscription/subscription_event.dart';
 import '../bloc/subscription/subscription_state.dart';
 import 'home_screen.dart';
+
 class FreeTrialScreen extends StatelessWidget {
   const FreeTrialScreen({
     super.key,
@@ -22,14 +24,15 @@ class FreeTrialScreen extends StatelessWidget {
 
   static const List<String> benefits = [
     'Route Optimization',
-    'GPS Navigation',
     'Multiple Stops',
+    'GPS Navigation',
     'ETA',
     'Delivery Time Windows',
-    'Package Details',
     'Stop Priority',
     'Breaks',
+    'Package Details',
   ];
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
@@ -39,13 +42,10 @@ class FreeTrialScreen extends StatelessWidget {
           if (state is SubscriptionSuccess) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                builder: (_) => const HomeScreen(),
-              ),
-                  (route) => false,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
             );
           }
-
           if (state is SubscriptionFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -63,74 +63,11 @@ class FreeTrialScreen extends StatelessWidget {
 
           return Scaffold(
             backgroundColor: background,
-            body: Stack(
+            body: Column(
               children: [
-                _buildBackgroundDecorations(),
-
-                SafeArea(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: _horizontalPadding(context),
-                        vertical: 24,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: 460,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildHeader(context),
-
-                            SizedBox(
-                              height: 26 * _scale(context),
-                            ),
-
-                            _buildHeroBanner(context),
-
-                            SizedBox(
-                              height: 26 * _scale(context),
-                            ),
-
-                            _buildBenefitsSection(context),
-
-                            SizedBox(
-                              height: 28 * _scale(context),
-                            ),
-
-                            _buildActionButton(
-                              context,
-                              isLoading,
-                            ),
-
-                            SizedBox(
-                              height: 12 * _scale(context),
-                            ),
-
-                            _buildMaybeLater(
-                              context,
-                              isLoading,
-                            ),
-
-                            SizedBox(
-                              height: 28 * _scale(context),
-                            ),
-
-                            // =========================================
-                            // PLANS
-                            // =========================================
-
-                            _buildPlansSection(context),
-
-                            SizedBox(
-                              height: 20 * _scale(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                _buildGradientHeader(context),
+                Expanded(
+                  child: _buildWhiteContent(context, isLoading),
                 ),
               ],
             ),
@@ -140,160 +77,73 @@ class FreeTrialScreen extends StatelessWidget {
     );
   }
 
-  // ============================================================
-  // RESPONSIVE SCALE
-  // ============================================================
+  // ================================================================
+  // GRADIENT HEADER
+  // ================================================================
 
-  double _scale(BuildContext context) {
-    final shortestSide =
-        MediaQuery.of(context).size.shortestSide;
-
-    return (shortestSide / 420).clamp(0.85, 1.1);
-  }
-
-  double _horizontalPadding(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-
-    return width > 600 ? 40 : 24;
-  }
-
-  // ============================================================
-  // BACKGROUND
-  // ============================================================
-
-  Widget _buildBackgroundDecorations() {
-    return Stack(
-      children: [
-        Positioned(
-          top: -110,
-          right: -110,
-          child: Container(
-            width: 300,
-            height: 300,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: primaryTeal.withValues(alpha: 0.10),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -90,
-          left: -90,
-          child: Container(
-            width: 260,
-            height: 260,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accentTeal.withValues(alpha: 0.10),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // HEADER
-  // ============================================================
-
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildGradientHeader(BuildContext context) {
     final scale = _scale(context);
-
-    return Column(
-      children: [
-        Container(
-          width: 92 * scale,
-          height: 92 * scale,
-          padding: EdgeInsets.all(16 * scale),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [
-                darkTeal,
-                primaryTeal,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: primaryTeal.withValues(alpha: 0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Image.asset(
-            'assets/images/logo.png',
-            fit: BoxFit.contain,
-            errorBuilder: (
-                context,
-                error,
-                stackTrace,
-                ) =>
-            const Icon(
-              Icons.card_giftcard_rounded,
-              size: 44,
-              color: Colors.white,
-            ),
-          ),
-        ),
-
-        SizedBox(height: 18 * scale),
-
-        Text(
-          'Start Your Free Trial',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 27 * scale,
-            fontWeight: FontWeight.w800,
-            color: darkTeal,
-            letterSpacing: -0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // HERO BANNER
-  // ============================================================
-
-  Widget _buildHeroBanner(BuildContext context) {
-    final scale = _scale(context);
+    final topPadding = MediaQuery.of(context).padding.top;
 
     return Container(
-      padding: EdgeInsets.all(24 * scale),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            darkTeal,
-            primaryTeal,
-          ],
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(24, topPadding + 20, 24, 36 * scale),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [darkTeal, primaryTeal],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: darkTeal.withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
       ),
       child: Column(
         children: [
+          // Logo
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 7,
+            width: 72 * scale,
+            height: 72 * scale,
+            padding: EdgeInsets.all(14 * scale),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+              ),
             ),
+            child: Image.asset(
+              'assets/images/logo.png',
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.card_giftcard_rounded,
+                size: 34,
+                color: Colors.white,
+              ),
+            ),
+          ),
+
+          SizedBox(height: 16 * scale),
+
+          // Title
+          Text(
+            'Try Premium Free',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 28 * scale,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+
+          SizedBox(height: 10 * scale),
+
+          // 14 Days badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: Colors.white.withValues(alpha: 0.35),
               ),
             ),
             child: const Text(
@@ -307,15 +157,15 @@ class FreeTrialScreen extends StatelessWidget {
             ),
           ),
 
-          SizedBox(height: 14 * scale),
+          SizedBox(height: 10 * scale),
 
+          // Subtitle
           Text(
-            'Try route planning features free for 14 days.\n'
-                'No charges until the trial ends.',
+            'Start your free trial today.\nNo charges until it ends.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.95),
-              fontSize: 14.5,
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 14,
               height: 1.5,
               fontWeight: FontWeight.w500,
             ),
@@ -325,31 +175,91 @@ class FreeTrialScreen extends StatelessWidget {
     );
   }
 
-  // ============================================================
+  // ================================================================
+  // WHITE CONTENT CARD
+  // ================================================================
+
+  Widget _buildWhiteContent(BuildContext context, bool isLoading) {
+    final scale = _scale(context);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 26 * scale, 20, 32 * scale),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildBenefitsSection(context),
+                SizedBox(height: 26 * scale),
+                _buildPlansSection(context),
+                SizedBox(height: 28 * scale),
+                _buildActionButton(context, isLoading),
+                SizedBox(height: 12 * scale),
+                _buildMaybeLater(context, isLoading),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ================================================================
+  // RESPONSIVE SCALE
+  // ================================================================
+
+  double _scale(BuildContext context) {
+    final shortestSide = MediaQuery.of(context).size.shortestSide;
+    return (shortestSide / 420).clamp(0.85, 1.1);
+  }
+
+  // ================================================================
   // BENEFITS
-  // ============================================================
+  // ================================================================
 
   Widget _buildBenefitsSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'What you get',
-          style: TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w700,
-            color: darkTeal,
-          ),
+        Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: primaryTeal.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.star_rounded,
+                color: primaryTeal,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: const Text(
+                "What you'll get",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: darkTeal,
+                ),
+              ),
+            ),
+          ],
         ),
-
         const SizedBox(height: 14),
-
         LayoutBuilder(
           builder: (context, constraints) {
             const double gap = 12;
-
-            final double itemWidth =
-                (constraints.maxWidth - gap) / 2;
+            final double itemWidth = (constraints.maxWidth - gap) / 2;
 
             return Wrap(
               spacing: gap,
@@ -357,12 +267,10 @@ class FreeTrialScreen extends StatelessWidget {
               children: benefits
                   .map(
                     (benefit) => SizedBox(
-                  width: itemWidth,
-                  child: _BenefitChip(
-                    text: benefit,
-                  ),
-                ),
-              )
+                      width: itemWidth,
+                      child: _BenefitChip(text: benefit),
+                    ),
+                  )
                   .toList(),
             );
           },
@@ -371,136 +279,33 @@ class FreeTrialScreen extends StatelessWidget {
     );
   }
 
-  // ============================================================
-  // START FREE TRIAL BUTTON
-  // ============================================================
-
-  Widget _buildActionButton(
-      BuildContext context,
-      bool isLoading,
-      ) {
-    return SizedBox(
-      height: 54,
-      child: ElevatedButton(
-        onPressed: isLoading
-            ? null
-            : () {
-          context.read<SubscriptionBloc>().add(
-            StartTrialEvent(
-              userId: userId,
-              email: email,
-            ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryTeal,
-          disabledBackgroundColor:
-          primaryTeal.withValues(alpha: 0.5),
-          elevation: 0,
-          shadowColor:
-          primaryTeal.withValues(alpha: 0.4),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: isLoading
-            ? const SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor:
-            AlwaysStoppedAnimation<Color>(
-              Colors.white,
-            ),
-          ),
-        )
-            : const Text(
-          'START FREE TRIAL',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // MAYBE LATER
-  // ============================================================
-
-  Widget _buildMaybeLater(
-      BuildContext context,
-      bool isLoading,
-      ) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: OutlinedButton(
-        onPressed: isLoading
-            ? null
-            : () {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const HomeScreen(),
-            ),
-                (route) => false,
-          );
-        },
-        style: OutlinedButton.styleFrom(
-          foregroundColor: primaryTeal,
-          side: BorderSide(
-            color: primaryTeal.withValues(alpha: 0.4),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: const Text(
-          'Maybe Later',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // PLANS SECTION
-  // ============================================================
+  // ================================================================
+  // PLANS
+  // ================================================================
 
   Widget _buildPlansSection(BuildContext context) {
+    final scale = _scale(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Choose Your Plan',
           style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
             color: darkTeal,
           ),
         ),
-
-        const SizedBox(height: 6),
-
-        const Text(
-          'Choose the plan that fits your needs.',
+        const SizedBox(height: 4),
+        Text(
+          'Pick the plan that fits your needs.',
           style: TextStyle(
             fontSize: 13,
-            color: Colors.grey,
+            color: Colors.grey.shade500,
           ),
         ),
-
-        const SizedBox(height: 16),
-
-        // FREE
+        SizedBox(height: 14 * scale),
         _buildPlanCard(
           title: 'Free',
           label: 'FREE',
@@ -509,12 +314,9 @@ class FreeTrialScreen extends StatelessWidget {
             'Up to 10 Stops / Route',
           ],
           buttonText: 'Continue Free',
-          onPressed: () {},
+          highlighted: false,
         ),
-
-        const SizedBox(height: 14),
-
-        // LITE
+        SizedBox(height: 12 * scale),
         _buildPlanCard(
           title: 'Lite',
           label: 'LITE',
@@ -524,11 +326,10 @@ class FreeTrialScreen extends StatelessWidget {
             'Some features restricted',
           ],
           buttonText: 'Choose Lite',
-          onPressed: () {},
+          highlighted: false,
         ),
-        const SizedBox(height: 14),
-        // STANDARD
-        _buildPlanCard(
+        SizedBox(height: 12 * scale),
+        _buildRecommendedPlanCard(
           title: 'Standard',
           label: 'STANDARD',
           features: const [
@@ -537,21 +338,21 @@ class FreeTrialScreen extends StatelessWidget {
             'Full Features',
           ],
           buttonText: 'Choose Standard',
-          onPressed: () {},
         ),
       ],
     );
   }
-  // ============================================================
-  // PLAN CARD
-  // ============================================================
+
+  // ================================================================
+  // PLAN CARD (Free / Lite)
+  // ================================================================
 
   Widget _buildPlanCard({
     required String title,
     required String label,
     required List<String> features,
     required String buttonText,
-    required VoidCallback onPressed,
+    required bool highlighted,
   }) {
     return Container(
       width: double.infinity,
@@ -560,58 +361,65 @@ class FreeTrialScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: primaryTeal,
-          width: 1.5,
+          color: primaryTeal.withValues(alpha: 0.18),
         ),
         boxShadow: [
           BoxShadow(
-            color: darkTeal.withValues(alpha: 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: darkTeal.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Plan name
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: darkTeal,
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: darkTeal,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: primaryTeal.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: primaryTeal,
+                  ),
+                ),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 4),
-
-          // FREE / LITE / STANDARD
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-              color: primaryTeal,
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          // Features
+          const SizedBox(height: 14),
           ...features.map(
             (feature) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(
                     Icons.check_circle_rounded,
-                    size: 19,
+                    size: 18,
                     color: primaryTeal,
                   ),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       feature,
@@ -626,15 +434,150 @@ class FreeTrialScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          const SizedBox(height: 17),
-
-          // Plan button — always filled
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 46,
+            child: OutlinedButton(
+              onPressed: () {},
+              style: OutlinedButton.styleFrom(
+                foregroundColor: primaryTeal,
+                side: BorderSide(
+                  color: primaryTeal.withValues(alpha: 0.5),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                buttonText,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================================================================
+  // RECOMMENDED PLAN CARD (Standard)
+  // ================================================================
+
+  Widget _buildRecommendedPlanCard({
+    required String title,
+    required String label,
+    required List<String> features,
+    required String buttonText,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: primaryTeal, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: primaryTeal.withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: darkTeal,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: primaryTeal.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: primaryTeal,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [darkTeal, primaryTeal],
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'RECOMMENDED',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...features.map(
+            (feature) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: primaryTeal,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      feature,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
             child: ElevatedButton(
-              onPressed: onPressed,
+              onPressed: () {},
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryTeal,
                 foregroundColor: Colors.white,
@@ -656,6 +599,97 @@ class FreeTrialScreen extends StatelessWidget {
       ),
     );
   }
+
+  // ================================================================
+  // ACTION BUTTON
+  // ================================================================
+
+  Widget _buildActionButton(BuildContext context, bool isLoading) {
+    final scale = _scale(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [darkTeal, primaryTeal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: primaryTeal.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        height: 54 * scale,
+        child: ElevatedButton(
+          onPressed: isLoading
+              ? null
+              : () {
+                  context.read<SubscriptionBloc>().add(
+                        StartTrialEvent(userId: userId, email: email),
+                      );
+                },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            disabledBackgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            disabledForegroundColor: Colors.white70,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  'START FREE TRIAL',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ================================================================
+  // MAYBE LATER
+  // ================================================================
+
+  Widget _buildMaybeLater(BuildContext context, bool isLoading) {
+    return TextButton(
+      onPressed: isLoading
+          ? null
+          : () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
+            },
+      child: const Text(
+        'Maybe Later',
+        style: TextStyle(
+          color: Colors.grey,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
 }
 
 // ================================================================
@@ -663,37 +697,22 @@ class FreeTrialScreen extends StatelessWidget {
 // ================================================================
 
 class _BenefitChip extends StatelessWidget {
-  const _BenefitChip({
-    required this.text,
-  });
+  const _BenefitChip({required this.text});
+
   final String text;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 13,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: FreeTrialScreen.lightMint.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: FreeTrialScreen.primaryTeal
-              .withValues(alpha: 0.15),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: FreeTrialScreen.darkTeal
-                .withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
           const Icon(
-            Icons.check_circle,
+            Icons.check_rounded,
             color: FreeTrialScreen.primaryTeal,
             size: 20,
           ),
