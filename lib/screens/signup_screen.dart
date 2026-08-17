@@ -4,7 +4,6 @@ import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_event.dart';
 import '../bloc/auth/auth_state.dart';
 import 'free_trial_screen.dart';
-
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -13,20 +12,16 @@ class SignupScreen extends StatefulWidget {
   static const Color accentTeal = Color(0xFF26A69A);
   static const Color lightMint = Color(0xFFE0F2F1);
   static const Color background = Color(0xFFF4F8F7);
-
   @override
   State<SignupScreen> createState() => _SignupScreenState();
 }
-
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -34,7 +29,6 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     super.dispose();
   }
-
   void _submit(BuildContext context) {
     if (_formKey.currentState?.validate() ?? false) {
       BlocProvider.of<AuthBloc>(context).add(
@@ -45,7 +39,6 @@ class _SignupScreenState extends State<SignupScreen> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider<AuthBloc>(
@@ -55,12 +48,10 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-
   Widget _buildContent(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isWide = size.width > 600;
     final scale = (size.shortestSide / 420).clamp(0.85, 1.1);
-
     return Scaffold(
       backgroundColor: SignupScreen.background,
       body: BlocListener<AuthBloc, AuthState>(

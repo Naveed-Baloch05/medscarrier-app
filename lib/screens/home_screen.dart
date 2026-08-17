@@ -1,20 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
 import '../widgets/home_content.dart';
-
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
   static const Color primaryTeal = HomeContent.primaryTeal;
   static const Color darkTeal = HomeContent.darkTeal;
   static const Color background = HomeContent.background;
-
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-
     if (user == null) {
       return const _CenteredMessage(
         icon: Icons.person_off_rounded,
@@ -22,7 +17,6 @@ class HomeScreen extends StatelessWidget {
         subtitle: 'Please sign in to continue.',
       );
     }
-
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
@@ -50,7 +44,6 @@ class HomeScreen extends StatelessWidget {
                 isLoading: true,
               );
             }
-
             if (snapshot.hasError) {
               return const _CenteredMessage(
                 icon: Icons.error_outline_rounded,
@@ -58,7 +51,6 @@ class HomeScreen extends StatelessWidget {
                 subtitle: 'Please check your connection and try again.',
               );
             }
-
             if (!snapshot.hasData ||
                 !snapshot.data!.exists ||
                 snapshot.data!.data() == null) {
