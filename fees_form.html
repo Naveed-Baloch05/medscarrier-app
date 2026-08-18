@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fee Form - MedsCarrier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #F4F8F7;
+            display: flex;
+            justify-content: center;
+            padding: 30px 15px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 550px;
+        }
+
+        .form-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 77, 64, 0.1);
+            overflow: hidden;
+        }
+
+        .form-header {
+            background: linear-gradient(135deg, #004D40, #00897B);
+            color: white;
+            text-align: center;
+            padding: 22px;
+        }
+
+        .form-header h2 {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .form-body {
+            padding: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #00897B;
+            box-shadow: 0 0 0 2px rgba(0, 137, 123, 0.15);
+        }
+
+        .form-group .error {
+            color: #d32f2f;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .form-group.invalid input,
+        .form-group.invalid select {
+            border-color: #d32f2f;
+        }
+
+        .form-group.invalid .error {
+            display: block;
+        }
+
+        .row {
+            display: flex;
+            gap: 14px;
+        }
+
+        .row .form-group {
+            flex: 1;
+        }
+
+        .total-box {
+            background: #E0F2F1;
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        .total-box label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #004D40;
+            margin-bottom: 4px;
+        }
+
+        .total-box p {
+            font-size: 22px;
+            font-weight: 700;
+            color: #004D40;
+            margin: 0;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 24px;
+        }
+
+        .btn-submit,
+        .btn-reset {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #004D40, #00897B);
+            color: white;
+        }
+
+        .btn-reset {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-submit:hover,
+        .btn-reset:hover {
+            opacity: 0.85;
+        }
+
+        /* Receipt */
+        .receipt {
+            display: none;
+            background: #fff;
+            border: 2px dashed #00897B;
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .receipt h3 {
+            color: #004D40;
+            text-align: center;
+            border-bottom: 2px solid #00897B;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .receipt .r-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .receipt .r-row:last-child {
+            border-bottom: none;
+        }
+
+        .receipt .r-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .receipt .r-value {
+            color: #222;
+        }
+
+        .receipt .r-total {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 2px solid #00897B;
+            font-size: 18px;
+        }
+
+        .receipt .r-total .r-label,
+        .receipt .r-total .r-value {
+            color: #004D40;
+            font-weight: 700;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-card">
+            <div class="form-header">
+                <h2>Fees Form</h2>
+            </div>
+            <div class="form-body">
+                <form id="feeForm" novalidate>
+
+                    <div class="form-group" id="gName">
+                        <label>Student Name</label>
+                        <input type="text" id="name" placeholder="Enter student name">
+                        <div class="error">Name is required</div>
+                    </div>
+
+                    <div class="form-group" id="gId">
+                        <label>Student ID</label>
+                        <input type="text" id="sid" placeholder="Enter student ID">
+                        <div class="error">ID is required</div>
+                    </div>
+
+                    <div class="form-group" id="gCourse">
+                        <label>Course</label>
+                        <select id="course">
+                            <option value="">Select course</option>
+                            <option value="B.Tech">B.Tech</option>
+                            <option value="BCA">BCA</option>
+                            <option value="MCA">MCA</option>
+                            <option value="MBA">MBA</option>
+                            <option value="B.Sc">B.Sc</option>
+                            <option value="M.Sc">M.Sc</option>
+                        </select>
+                        <div class="error">Please select a course</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group" id="gTuition">
+                            <label>Tuition Fee</label>
+                            <input type="number" class="fee-input" id="tuition" placeholder="0" min="0">
+                            <div class="error">Required</div>
+                        </div>
+                        <div class="form-group" id="gLab">
+                            <label>Lab Fee</label>
+                            <input type="number" class="fee-input" id="lab" placeholder="0" min="0">
+                            <div class="error">Required</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group" id="gLib">
+                            <label>Library Fee</label>
+                            <input type="number" class="fee-input" id="library" placeholder="0" min="0">
+                            <div class="error">Required</div>
+                        </div>
+                        <div class="form-group">
+                            <div class="total-box">
+                                <label>Total Fee</label>
+                                <p id="total">₹ 0.00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="gMethod">
+                        <label>Payment Method</label>
+                        <select id="method">
+                            <option value="">Select method</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Online">Online</option>
+                            <option value="Card">Card</option>
+                            <option value="UPI">UPI</option>
+                        </select>
+                        <div class="error">Please select a method</div>
+                    </div>
+
+                    <div class="form-group" id="gDate">
+                        <label>Payment Date</label>
+                        <input type="date" id="date">
+                        <div class="error">Please select a date</div>
+                    </div>
+
+                    <div class="btn-row">
+                        <button type="submit" class="btn-submit">Submit</button>
+                        <button type="button" class="btn-reset" id="resetBtn">Reset</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="receipt" id="receipt">
+            <h3>Payment Receipt</h3>
+            <div class="r-row"><span class="r-label">Student Name</span><span class="r-value" id="rName"></span></div>
+            <div class="r-row"><span class="r-label">Student ID</span><span class="r-value" id="rId"></span></div>
+            <div class="r-row"><span class="r-label">Course</span><span class="r-value" id="rCourse"></span></div>
+            <div class="r-row"><span class="r-label">Tuition Fee</span><span class="r-value" id="rTuition"></span></div>
+            <div class="r-row"><span class="r-label">Lab Fee</span><span class="r-value" id="rLab"></span></div>
+            <div class="r-row"><span class="r-label">Library Fee</span><span class="r-value" id="rLib"></span></div>
+            <div class="r-row r-total"><span class="r-label">Total Fee</span><span class="r-value" id="rTotal"></span></div>
+            <div class="r-row"><span class="r-label">Payment Method</span><span class="r-value" id="rMethod"></span></div>
+            <div class="r-row"><span class="r-label">Date</span><span class="r-value" id="rDate"></span></div>
+        </div>
+    </div>
+
+    <script>
+        var feeInputs = document.querySelectorAll('.fee-input');
+        var totalEl = document.getElementById('total');
+
+        feeInputs.forEach(function (input) {
+            input.addEventListener('input', calcTotal);
+        });
+
+        function calcTotal() {
+            var sum = 0;
+            feeInputs.forEach(function (input) {
+                sum += parseFloat(input.value) || 0;
+            });
+            totalEl.textContent = '₹ ' + sum.toFixed(2);
+        }
+
+        function showError(id) {
+            document.getElementById(id).classList.add('invalid');
+        }
+
+        function clearError(id) {
+            document.getElementById(id).classList.remove('invalid');
+        }
+
+        document.getElementById('feeForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var valid = true;
+
+            if (!document.getElementById('name').value.trim()) { showError('gName'); valid = false; } else clearError('gName');
+            if (!document.getElementById('sid').value.trim()) { showError('gId'); valid = false; } else clearError('gId');
+            if (!document.getElementById('course').value) { showError('gCourse'); valid = false; } else clearError('gCourse');
+            if (!document.getElementById('tuition').value) { showError('gTuition'); valid = false; } else clearError('gTuition');
+            if (!document.getElementById('lab').value) { showError('gLab'); valid = false; } else clearError('gLab');
+            if (!document.getElementById('library').value) { showError('gLib'); valid = false; } else clearError('gLib');
+            if (!document.getElementById('method').value) { showError('gMethod'); valid = false; } else clearError('gMethod');
+            if (!document.getElementById('date').value) { showError('gDate'); valid = false; } else clearError('gDate');
+
+            if (!valid) return;
+
+            document.getElementById('rName').textContent = document.getElementById('name').value;
+            document.getElementById('rId').textContent = document.getElementById('sid').value;
+            document.getElementById('rCourse').textContent = document.getElementById('course').value;
+            document.getElementById('rTuition').textContent = '₹ ' + parseFloat(document.getElementById('tuition').value).toFixed(2);
+            document.getElementById('rLab').textContent = '₹ ' + parseFloat(document.getElementById('lab').value).toFixed(2);
+            document.getElementById('rLib').textContent = '₹ ' + parseFloat(document.getElementById('library').value).toFixed(2);
+            document.getElementById('rTotal').textContent = totalEl.textContent;
+            document.getElementById('rMethod').textContent = document.getElementById('method').value;
+            document.getElementById('rDate').textContent = document.getElementById('date').value;
+
+            var receipt = document.getElementById('receipt');
+            receipt.style.display = 'block';
+            receipt.scrollIntoView({ behavior: 'smooth' });
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', function () {
+            document.getElementById('feeForm').reset();
+            totalEl.textContent = '₹ 0.00';
+            document.getElementById('receipt').style.display = 'none';
+            document.querySelectorAll('.form-group').forEach(function (g) {
+                g.classList.remove('invalid');
+            });
+        });
+    </script>
+</body>
+</html>

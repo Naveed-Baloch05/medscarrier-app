@@ -26,7 +26,7 @@ class _FreeTrialScreenState extends State<FreeTrialScreen> {
   static const Color lightMint = Color(0xFFE0F2F1);
   static const Color background = Color(0xFFF8FAFC);
 
-  int _selectedPlanIndex = 2; // Default Standard/Recommended Plan
+  int _selectedPlanIndex = 2;
 
   // Play Store confirm Tiers (Client-approved features aur prices directly map kar sakte hain)
   static const List<Map<String, dynamic>> plans = [
@@ -254,7 +254,6 @@ class _FreeTrialScreenState extends State<FreeTrialScreen> {
       },
     );
   }
-
   Widget _buildPlanSelector() {
     return Column(
       children: List.generate(plans.length, (index) {
