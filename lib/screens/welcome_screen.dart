@@ -4,7 +4,7 @@ import '../bloc/welcome/welcome_bloc.dart';
 import '../bloc/welcome/welcome_event.dart';
 import '../bloc/welcome/welcome_state.dart';
 import 'login_screen.dart';
-import 'signup_screen.dart';
+import '../widgets/account_type_sheet.dart';
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -16,9 +16,8 @@ class WelcomeScreen extends StatelessWidget {
         body: BlocListener<WelcomeBloc, WelcomeState>(
           listener: (context, state) {
             if (state is NavigateToSignupState) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SignupScreen()),
-              );
+              // Show bottom sheet to choose between Rider and Pharmacy
+              showAccountTypeSelector(context);
             } else if (state is NavigateToLoginState) {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),

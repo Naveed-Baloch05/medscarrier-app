@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:medscarrier/widgets/home_content.dart';
 import 'package:medscarrier/screens/free_trial_screen.dart';
-import 'package:medscarrier/screens/login_screen.dart';
 import 'package:medscarrier/screens/signup_screen.dart';
+import 'package:medscarrier/screens/pharmacy_signup_screen.dart';
+import 'package:medscarrier/screens/rider_signup_screen.dart';
 import 'package:medscarrier/screens/splash_screen.dart';
 import 'package:medscarrier/screens/welcome_screen.dart';
 
@@ -20,7 +21,7 @@ void main() {
     expect(find.text('Login'), findsOneWidget);
   });
 
-  testWidgets('WelcomeScreen Signup button navigates to SignupScreen',
+  testWidgets('WelcomeScreen Signup button opens account type sheet',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3.0;
@@ -31,7 +32,8 @@ void main() {
     await tester.tap(find.text('Signup'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SignupScreen), findsOneWidget);
+    expect(find.text('Pharmacy'), findsOneWidget);
+    expect(find.text('Rider'), findsOneWidget);
   });
 
   testWidgets('WelcomeScreen Login button navigates to LoginScreen',
@@ -45,7 +47,7 @@ void main() {
     await tester.tap(find.text('Login'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets('SignupScreen is responsive across Android screen sizes',
@@ -137,6 +139,61 @@ void main() {
 
       expect(find.byType(HomeContent), findsOneWidget,
           reason: 'Expired HomeContent overflowed or failed to build at $size');
+
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  testWidgets('RiderSignupScreen is responsive across Android screen sizes',
+      (WidgetTester tester) async {
+    const sizes = <Size>[
+      Size(320, 568),
+      Size(360, 640),
+      Size(360, 800),
+      Size(412, 915),
+      Size(600, 960),
+      Size(800, 1280),
+    ];
+
+    for (final size in sizes) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: RiderSignupScreen())));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(RiderSignupScreen), findsOneWidget,
+          reason: 'RiderSignupScreen overflowed or failed to build at $size');
+
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  testWidgets('PharmacySignupScreen is responsive across Android screen sizes',
+      (WidgetTester tester) async {
+    const sizes = <Size>[
+      Size(320, 568),
+      Size(360, 640),
+      Size(360, 800),
+      Size(412, 915),
+      Size(600, 960),
+      Size(800, 1280),
+    ];
+
+    for (final size in sizes) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const MaterialApp(
+          home: Scaffold(body: PharmacySignupScreen())));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(PharmacySignupScreen), findsOneWidget,
+          reason:
+              'PharmacySignupScreen overflowed or failed to build at $size');
 
       await tester.pumpWidget(const SizedBox());
     }

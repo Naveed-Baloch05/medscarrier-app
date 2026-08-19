@@ -286,19 +286,40 @@ class _FreeTrialScreenState extends State<FreeTrialScreen> {
             ),
             child: Row(
               children: [
-                Radio<int>(
-                  value: index,
-                  groupValue: _selectedPlanIndex,
-                  activeColor: primaryTeal,
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedPlanIndex = val);
-                  },
+                GestureDetector(
+                  onTap: () => setState(() => _selectedPlanIndex = index),
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? primaryTeal : Colors.grey.shade400,
+                        width: 2,
+                      ),
+                    ),
+                    child: isSelected
+                        ? Center(
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: primaryTeal,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             plan['title'],
@@ -308,8 +329,7 @@ class _FreeTrialScreenState extends State<FreeTrialScreen> {
                               color: darkTeal,
                             ),
                           ),
-                          if (isRecommended) ...[
-                            const SizedBox(width: 8),
+                          if (isRecommended)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -328,7 +348,6 @@ class _FreeTrialScreenState extends State<FreeTrialScreen> {
                                 ),
                               ),
                             ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 4),
