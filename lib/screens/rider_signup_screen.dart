@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../bloc/rider_signup/rider_signup_bloc.dart';
+import '../bloc/rider_signup/rider_signup_event.dart';
+import '../bloc/rider_signup/rider_signup_state.dart';
 
 class RiderSignupScreen extends StatefulWidget {
   const RiderSignupScreen({super.key});
@@ -16,6 +21,40 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
   String _selectedVehicle = 'Bike';
   bool _agreeToTerms = true;
 
+  final _fullNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _vehicleRegController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _vehicleRegController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the Terms of Service')),
+      );
+      return;
+    }
+
+    context.read<RiderSignupBloc>().add(RiderSignupSubmitted(
+          fullName: _fullNameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
+          vehicleType: _selectedVehicle,
+          vehicleReg: _vehicleRegController.text.trim(),
+          password: _passwordController.text,
+        ));
+  }
+
   double _scale(BuildContext context) {
     final shortestSide = MediaQuery.of(context).size.shortestSide;
     return (shortestSide / 420).clamp(0.85, 1.1);
@@ -27,155 +66,207 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 600;
 
-    return Scaffold(
-      backgroundColor: lightBackground,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isWide ? 40 : 24,
-            vertical: 16,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildTopBar(context),
-
-                  SizedBox(height: 20 * scale),
-
-                  _buildProfilePhotoPicker(scale),
-
-                  SizedBox(height: 16 * scale),
-
-                  Text(
-                    'Become a rider',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 26 * scale,
-                      fontWeight: FontWeight.w800,
-                      color: darkText,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  SizedBox(height: 6 * scale),
-                  const Text(
-                    'Set up your account to start delivering.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: textMuted,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-
-                  SizedBox(height: 24 * scale),
-
-                  _buildCustomTextField(
-                    hintText: 'Full name',
-                    icon: Icons.person_outline_rounded,
-                  ),
-                  SizedBox(height: 12 * scale),
-                  _buildCustomTextField(
-                    hintText: 'you@email.co.uk',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  SizedBox(height: 12 * scale),
-                  _buildCustomTextField(
-                    hintText: '07xxx xxx xxx',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                  ),
-
-                  SizedBox(height: 20 * scale),
-
-                  _buildVehicleTypeSelector(scale),
-
-                  SizedBox(height: 12 * scale),
-
-                  _buildCustomTextField(
-                    hintText: 'Vehicle registration number',
-                    icon: Icons.payment_rounded,
-                  ),
-
-                  SizedBox(height: 20 * scale),
-
-                  _buildUploadLicenceSection(),
-
-                  SizedBox(height: 12 * scale),
-
-                  _buildCustomTextField(
-                    hintText: 'Create a password',
-                    icon: Icons.lock_outline_rounded,
-                    isPassword: true,
-                  ),
-
-                  SizedBox(height: 16 * scale),
-
-                  _buildTermsCheckbox(scale),
-
-                  SizedBox(height: 24 * scale),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54 * scale,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryAccent,
-                        foregroundColor: Colors.white,
-                        elevation: 4,
-                        shadowColor: primaryAccent.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
+    return BlocProvider(
+      create: (_) => RiderSignupBloc(),
+      child: Builder(
+        builder: (context) {
+          return Scaffold(
+            backgroundColor: lightBackground,
+            body: SafeArea(
+              child: BlocListener<RiderSignupBloc, RiderSignupState>(
+                listener: (context, state) {
+                  if (state is RiderSignupSuccess) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Welcome ${state.rider.fullName}! Your account is under review.',
                         ),
+                        backgroundColor: Colors.teal,
                       ),
-                      child: Text(
-                        'Submit for review',
-                        style: TextStyle(
-                          fontSize: 16 * scale,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    );
+                    Navigator.of(context).pop();
+                  } else if (state is RiderSignupFailure) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(state.message),
+                        backgroundColor: Colors.red,
                       ),
-                    ),
+                    );
+                  }
+                },
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isWide ? 40 : 24,
+                    vertical: 16,
                   ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          _buildTopBar(context),
 
-                  SizedBox(height: 16 * scale),
+                          SizedBox(height: 20 * scale),
 
-                  _buildVerificationCard(),
+                          _buildProfilePhotoPicker(scale),
 
-                  SizedBox(height: 24 * scale),
+                          SizedBox(height: 16 * scale),
 
-                  // Bottom Login Navigation
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Text(
-                        'Already have an account? ',
-                        style: TextStyle(color: textMuted, fontSize: 13.5),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Text(
-                          'Log in',
-                          style: TextStyle(
-                            color: primaryAccent,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.5,
+                          Text(
+                            'Become a rider',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 26 * scale,
+                              fontWeight: FontWeight.w800,
+                              color: darkText,
+                              letterSpacing: -0.5,
+                            ),
                           ),
-                        ),
+                          SizedBox(height: 6 * scale),
+                          const Text(
+                            'Set up your account to start delivering.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+
+                          SizedBox(height: 24 * scale),
+
+                          _buildCustomTextField(
+                            controller: _fullNameController,
+                            hintText: 'Full name',
+                            icon: Icons.person_outline_rounded,
+                          ),
+                          SizedBox(height: 12 * scale),
+                          _buildCustomTextField(
+                            controller: _emailController,
+                            hintText: 'you@email.co.uk',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          SizedBox(height: 12 * scale),
+                          _buildCustomTextField(
+                            controller: _phoneController,
+                            hintText: '07xxx xxx xxx',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                          ),
+
+                          SizedBox(height: 20 * scale),
+
+                          _buildVehicleTypeSelector(scale),
+
+                          SizedBox(height: 12 * scale),
+
+                          _buildCustomTextField(
+                            controller: _vehicleRegController,
+                            hintText: 'Vehicle registration number',
+                            icon: Icons.payment_rounded,
+                          ),
+
+                          SizedBox(height: 20 * scale),
+
+                          _buildUploadLicenceSection(),
+
+                          SizedBox(height: 12 * scale),
+
+                          _buildCustomTextField(
+                            controller: _passwordController,
+                            hintText: 'Create a password',
+                            icon: Icons.lock_outline_rounded,
+                            isPassword: true,
+                          ),
+
+                          SizedBox(height: 16 * scale),
+
+                          _buildTermsCheckbox(scale),
+
+                          SizedBox(height: 24 * scale),
+
+                          BlocBuilder<RiderSignupBloc, RiderSignupState>(
+                            builder: (context, state) {
+                              final isLoading = state is RiderSignupLoading;
+                              return SizedBox(
+                                width: double.infinity,
+                                height: 54 * scale,
+                                child: ElevatedButton(
+                                  onPressed: isLoading ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryAccent,
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor:
+                                        primaryAccent.withValues(alpha: 0.5),
+                                    elevation: 4,
+                                    shadowColor:
+                                        primaryAccent.withValues(alpha: 0.4),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                  ),
+                                  child: isLoading
+                                      ? SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white
+                                                .withValues(alpha: 0.9),
+                                          ),
+                                        )
+                                      : Text(
+                                          'Submit for review',
+                                          style: TextStyle(
+                                            fontSize: 16 * scale,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          SizedBox(height: 16 * scale),
+
+                          _buildVerificationCard(),
+
+                          SizedBox(height: 24 * scale),
+
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              const Text(
+                                'Already have an account? ',
+                                style: TextStyle(
+                                    color: textMuted, fontSize: 13.5),
+                              ),
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: const Text(
+                                  'Log in',
+                                  style: TextStyle(
+                                    color: primaryAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12 * scale),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                  SizedBox(height: 12 * scale),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -268,6 +359,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
 
   // --- TEXT INPUT FIELD ---
   Widget _buildCustomTextField({
+    required TextEditingController controller,
     required String hintText,
     required IconData icon,
     bool isPassword = false,
@@ -279,6 +371,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
         borderRadius: BorderRadius.circular(24),
       ),
       child: TextField(
+        controller: controller,
         obscureText: isPassword,
         keyboardType: keyboardType,
         decoration: InputDecoration(
@@ -343,8 +436,9 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                         Icon(
                           type['icon'] as IconData,
                           size: 20 * scale,
-                          color:
-                              isSelected ? Colors.white : Colors.grey.shade600,
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.grey.shade600,
                         ),
                         SizedBox(height: 2 * scale),
                         Text(
@@ -389,7 +483,8 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shield_outlined, size: 14, color: Colors.teal.shade700),
+                Icon(Icons.shield_outlined,
+                    size: 14, color: Colors.teal.shade700),
                 const SizedBox(width: 4),
                 Text(
                   'Reviewed by admin',

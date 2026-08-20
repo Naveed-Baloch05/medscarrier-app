@@ -5,6 +5,7 @@ class AppTheme {
     return ThemeData(
       primarySwatch: Colors.blue,
       useMaterial3: true,
+      brightness: Brightness.light,
     );
   }
 

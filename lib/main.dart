@@ -5,19 +5,19 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'bloc/app_bloc.dart';
+import 'bloc/theme/theme_bloc.dart';
+import 'bloc/theme/theme_event.dart';
+import 'bloc/theme/theme_state.dart';
 import 'core/constants/app_constants.dart';
-import 'core/utils/app_theme.dart';
 import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Lock app to portrait mode
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
@@ -30,17 +30,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => AppBloc(),
-      child: MaterialApp(
-        title: AppConstants.appName,
-        theme: AppTheme.lightTheme,
-
-        // Always use Light theme
-        themeMode: ThemeMode.light,
-
-        debugShowCheckedModeBanner: false,
-        home: const SplashScreen(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => AppBloc()),
+        BlocProvider(
+          create: (_) => ThemeBloc()..add(ThemeLoaded()),
+        ),
+      ],
+      child: BlocBuilder<ThemeBloc, ThemeState>(
+        builder: (context, themeState) {
+          return MaterialApp(
+            title: AppConstants.appName,
+            theme: themeState.themeData,
+            themeMode: themeState.themeMode,
+            debugShowCheckedModeBanner: false,
+            home: const SplashScreen(),
+          );
+        },
       ),
     );
   }
