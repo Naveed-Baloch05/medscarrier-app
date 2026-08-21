@@ -15,145 +15,136 @@ class PharmacyOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: Colors.grey.shade200,
+            color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --------------------------------------------------
             // ORDER ID + TIME
-            // --------------------------------------------------
-
             Row(
               children: [
                 Text(
                   order.id,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
+                    color: cs.primary,
                   ),
                 ),
-
                 const Spacer(),
-
                 Text(
                   order.time,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade600,
+                    color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
 
-            // --------------------------------------------------
             // CUSTOMER INFORMATION
-            // --------------------------------------------------
-
             Row(
               children: [
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.person_outline_rounded,
-                    color: Colors.grey.shade700,
+                    color: cs.onSurfaceVariant,
                     size: 23,
                   ),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         order.customerName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
                         ),
                       ),
-
                       const SizedBox(height: 4),
-
                       Text(
-                        '${order.medicineCount} '
-                        '${order.medicineCount == 1 ? 'Medicine' : 'Medicines'}',
+                        '${order.medicineCount} ${order.medicineCount == 1 ? 'Medicine' : 'Medicines'}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                const Icon(
+                Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 15,
-                  color: Colors.grey,
+                  color: cs.onSurfaceVariant,
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
 
-            // --------------------------------------------------
-            // DIVIDER
-            // --------------------------------------------------
-
-            Divider(
-              height: 1,
-              color: Colors.grey.shade200,
-            ),
-
+            Divider(height: 1, color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
             const SizedBox(height: 14),
 
-            // --------------------------------------------------
-            // STATUS + TOTAL
-            // --------------------------------------------------
+            // RIDER INFO
+            if (order.riderName.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(
+                    Icons.delivery_dining_rounded,
+                    size: 16,
+                    color: cs.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Rider: ${order.riderName}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
 
+            // STATUS + TOTAL
             Row(
               children: [
-                PharmacyOrderStatusBadge(
-                  status: order.status,
-                ),
-
+                PharmacyOrderStatusBadge(status: order.status),
                 const Spacer(),
-
                 Text(
                   '£${order.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
                   ),
                 ),
               ],

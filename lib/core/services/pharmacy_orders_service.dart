@@ -15,14 +15,16 @@ class PharmacyOrdersService {
       time: '10:24 AM',
       status: 'New',
       totalAmount: 24.99,
+      items: ['Ibuprofen 200mg', 'Paracetamol 500mg', 'Cetirizine 10mg'],
     ),
     const PharmacyOrder(
       id: '#ORD-2049',
       customerName: 'Sarah Wilson',
-      medicineCount: 1,
+      medicineCount: 2,
       time: '10:18 AM',
       status: 'Preparing',
-      totalAmount: 12.50,
+      totalAmount: 31.50,
+      items: ['Amoxicillin 500mg', 'Omeprazole 20mg'],
     ),
     const PharmacyOrder(
       id: '#ORD-2050',
@@ -31,6 +33,9 @@ class PharmacyOrdersService {
       time: '09:55 AM',
       status: 'Ready',
       totalAmount: 45.00,
+      items: ['Metformin 850mg', 'Amlodipine 5mg', 'Atorvastatin 20mg', 'Omeprazole 20mg', 'Salbutamol Inhaler'],
+      riderName: 'Ahmed Khan',
+      riderPhone: '07987654321',
     ),
     const PharmacyOrder(
       id: '#ORD-2051',
@@ -39,6 +44,9 @@ class PharmacyOrdersService {
       time: '09:30 AM',
       status: 'Delivered',
       totalAmount: 18.75,
+      items: ['Loratadine 10mg', 'Fexofenadine 120mg'],
+      riderName: 'David Lee',
+      riderPhone: '07456123789',
     ),
     const PharmacyOrder(
       id: '#ORD-2052',
@@ -47,6 +55,7 @@ class PharmacyOrdersService {
       time: '09:12 AM',
       status: 'New',
       totalAmount: 33.20,
+      items: ['Naproxen 500mg', 'Codeine Phosphate 30mg', 'Tramadol 50mg', 'Paracetamol 1g'],
     ),
     const PharmacyOrder(
       id: '#ORD-2053',
@@ -55,6 +64,7 @@ class PharmacyOrdersService {
       time: '08:45 AM',
       status: 'Preparing',
       totalAmount: 8.99,
+      items: ['Salbutamol Inhaler'],
     ),
     const PharmacyOrder(
       id: '#ORD-2054',
@@ -63,10 +73,46 @@ class PharmacyOrdersService {
       time: '08:20 AM',
       status: 'Delivered',
       totalAmount: 22.00,
+      items: ['Metformin 850mg', 'Gliclazide 80mg'],
+      riderName: 'Ahmed Khan',
+      riderPhone: '07987654321',
+    ),
+    const PharmacyOrder(
+      id: '#ORD-2055',
+      customerName: 'Priya Patel',
+      medicineCount: 3,
+      time: '08:05 AM',
+      status: 'Ready',
+      totalAmount: 28.50,
+      items: ['Co-codamol 30/500', 'Ibuprofen 400mg', 'Paracetamol 500mg'],
+      riderName: 'David Lee',
+      riderPhone: '07456123789',
+    ),
+    const PharmacyOrder(
+      id: '#ORD-2056',
+      customerName: 'Emma Watson',
+      medicineCount: 1,
+      time: 'Yesterday',
+      status: 'Delivered',
+      totalAmount: 14.99,
+      items: ['Fluticasone Nasal Spray'],
+      riderName: 'Ahmed Khan',
+      riderPhone: '07987654321',
+    ),
+    const PharmacyOrder(
+      id: '#ORD-2057',
+      customerName: 'Tom Richards',
+      medicineCount: 2,
+      time: 'Yesterday',
+      status: 'Delivered',
+      totalAmount: 19.98,
+      items: ['Azithromycin 250mg', 'Lansoprazole 30mg'],
+      riderName: 'David Lee',
+      riderPhone: '07456123789',
     ),
   ];
 
-  int _nextId = 2055;
+  int _nextId = 2058;
 
   Future<List<PharmacyOrder>> getOrders() async {
     await Future.delayed(const Duration(milliseconds: 800));
@@ -123,5 +169,25 @@ class PharmacyOrdersService {
   Future<void> deleteOrder(String id) async {
     await Future.delayed(const Duration(milliseconds: 300));
     _orders.removeWhere((o) => o.id == id);
+  }
+
+  Future<void> updateOrderStatus({
+    required String id,
+    required String newStatus,
+    String riderName = '',
+    String riderPhone = '',
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    final index = _orders.indexWhere((o) => o.id == id);
+    if (index == -1) {
+      throw Exception('Order not found.');
+    }
+
+    _orders[index] = _orders[index].copyWith(
+      status: newStatus,
+      riderName: riderName,
+      riderPhone: riderPhone,
+    );
   }
 }

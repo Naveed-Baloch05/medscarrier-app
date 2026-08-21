@@ -16,6 +16,7 @@ class PharmacyOrdersBloc
     on<PharmacyOrderAdded>(_onAdded);
     on<PharmacyOrderUpdated>(_onUpdated);
     on<PharmacyOrderDeleted>(_onDeleted);
+    on<PharmacyOrderStatusChanged>(_onStatusChanged);
   }
 
   final PharmacyOrdersService _service;
@@ -184,6 +185,37 @@ class PharmacyOrdersBloc
   ) async {
     try {
       await _service.deleteOrder(event.id);
+
+      final allOrders = await _service.getOrders();
+      final filtered = _applyFilters(
+        allOrders,
+        _currentSearch,
+        _currentStatus,
+      );
+
+      emit(PharmacyOrdersLoaded(
+        orders: filtered,
+        allOrders: allOrders,
+        selectedStatus: _currentStatus,
+      ));
+    } catch (error) {
+      emit(PharmacyOrdersError(
+        error.toString().replaceFirst('Exception: ', ''),
+      ));
+    }
+  }
+
+  Future<void> _onStatusChanged(
+    PharmacyOrderStatusChanged event,
+    Emitter<PharmacyOrdersState> emit,
+  ) async {
+    try {
+      await _service.updateOrderStatus(
+        id: event.id,
+        newStatus: event.newStatus,
+        riderName: event.riderName,
+        riderPhone: event.riderPhone,
+      );
 
       final allOrders = await _service.getOrders();
       final filtered = _applyFilters(

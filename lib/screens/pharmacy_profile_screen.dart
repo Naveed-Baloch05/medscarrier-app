@@ -9,22 +9,13 @@ import '../bloc/theme/theme_event.dart';
 import '../bloc/theme/theme_state.dart';
 
 class PharmacyProfileScreen extends StatefulWidget {
-  const PharmacyProfileScreen({
-    super.key,
-  });
+  const PharmacyProfileScreen({super.key});
 
   @override
-  State<PharmacyProfileScreen> createState() =>
-      _PharmacyProfileScreenState();
+  State<PharmacyProfileScreen> createState() => _PharmacyProfileScreenState();
 }
 
-class _PharmacyProfileScreenState
-    extends State<PharmacyProfileScreen> {
-  // ============================================================
-  // TEMPORARY PROFILE DATA
-  // Backend will be connected later.
-  // ============================================================
-
+class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
   String pharmacyName = 'MedCare Pharmacy';
   String pharmacistName = 'Naveed Baloch';
   String phone = '+92 300 1234567';
@@ -40,143 +31,62 @@ class _PharmacyProfileScreenState
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-
-      // ==========================================================
-      // APP BAR
-      // ==========================================================
-
+      backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-
-        title: const Text(
+        title: Text(
           'Profile',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface),
         ),
       ),
-
-      // ==========================================================
-      // BODY
-      // ==========================================================
-
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            20,
-            8,
-            20,
-            30,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
           children: [
-
-            // ======================================================
-            // PROFILE HEADER
-            // ======================================================
-
-            _buildProfileHeader(),
-
+            _buildProfileHeader(context, cs, isDark),
             const SizedBox(height: 20),
-
-            // ======================================================
-            // PHARMACY INFORMATION
-            // ======================================================
-
-            const Text(
-              'Pharmacy Information',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-
+            _sectionTitle('Pharmacy Information', cs),
             const SizedBox(height: 12),
-
-            _buildInformationCard(),
-
+            _buildInformationCard(context, cs, isDark),
             const SizedBox(height: 22),
-
-            // ======================================================
-            // BUSINESS DETAILS
-            // ======================================================
-
-            const Text(
-              'Business Details',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-
+            _sectionTitle('Business Details', cs),
             const SizedBox(height: 12),
-
-            _buildBusinessCard(),
-
+            _buildBusinessCard(context, cs, isDark),
             const SizedBox(height: 22),
-
-            // ======================================================
-            // ACCOUNT
-            // ======================================================
-
-            const Text(
-              'Account',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-
+            _sectionTitle('Account', cs),
             const SizedBox(height: 12),
-
-            _buildAccountCard(),
-
+            _buildAccountCard(context, cs, isDark),
             const SizedBox(height: 22),
-
-            // ======================================================
-            // LOGOUT
-            // ======================================================
-
-            _buildLogoutButton(),
+            _buildLogoutButton(cs, isDark),
           ],
         ),
       ),
     );
   }
 
-  // ============================================================
-  // PROFILE HEADER
-  // ============================================================
+  Widget _sectionTitle(String title, ColorScheme cs) {
+    return Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface));
+  }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context, ColorScheme cs, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
-
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
       ),
-
       child: Column(
         children: [
-          // ------------------------------------------------------
-          // PROFILE IMAGE
-          // ------------------------------------------------------
-
           GestureDetector(
             onTap: _showImageOptions,
             child: Stack(
@@ -184,177 +94,80 @@ class _PharmacyProfileScreenState
                 Container(
                   width: 78,
                   height: 78,
-
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
                     shape: BoxShape.circle,
                   ),
-
                   clipBehavior: Clip.antiAlias,
-
                   child: _profileImage != null
-                      ? Image.file(
-                          _profileImage!,
-                          fit: BoxFit.cover,
-                        )
-                      : Icon(
-                          Icons.local_pharmacy_outlined,
-                          size: 38,
-                          color: Colors.grey.shade700,
-                        ),
+                      ? Image.file(_profileImage!, fit: BoxFit.cover)
+                      : Icon(Icons.local_pharmacy_outlined, size: 38, color: cs.onSurfaceVariant),
                 ),
-
                 Positioned(
                   bottom: 0,
                   right: 0,
-
                   child: Container(
                     width: 28,
                     height: 28,
-
                     decoration: BoxDecoration(
-                      color: Colors.black,
+                      color: cs.primary,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 2,
-                      ),
+                      border: Border.all(color: Theme.of(context).cardColor, width: 2),
                     ),
-
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      size: 14,
-                      color: Colors.white,
-                    ),
+                    child: const Icon(Icons.camera_alt_outlined, size: 14, color: Colors.white),
                   ),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 14),
-
-          // ------------------------------------------------------
-          // PHARMACY NAME
-          // ------------------------------------------------------
-
-          Text(
-            pharmacyName,
-            textAlign: TextAlign.center,
-
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-
+          Text(pharmacyName, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
           const SizedBox(height: 5),
-
-          // ------------------------------------------------------
-          // PHARMACIST
-          // ------------------------------------------------------
-
-          Text(
-            pharmacistName,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
-          ),
-
+          Text(pharmacistName, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
           const SizedBox(height: 14),
-
-          // ------------------------------------------------------
-          // STATUS
-          // ------------------------------------------------------
-
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 7,
-            ),
-
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
               color: pharmacyOpen
-                  ? Colors.green.shade50
-                  : Colors.red.shade50,
-
+                  ? (isDark ? const Color(0xFF15301D) : Colors.green.shade50)
+                  : (isDark ? const Color(0xFF2D1B1B) : Colors.red.shade50),
               borderRadius: BorderRadius.circular(20),
             ),
-
             child: Row(
               mainAxisSize: MainAxisSize.min,
-
               children: [
                 Container(
                   width: 7,
                   height: 7,
-
                   decoration: BoxDecoration(
-                    color: pharmacyOpen
-                        ? Colors.green.shade600
-                        : Colors.red.shade600,
+                    color: pharmacyOpen ? Colors.green.shade600 : Colors.red.shade600,
                     shape: BoxShape.circle,
                   ),
                 ),
-
                 const SizedBox(width: 7),
-
                 Text(
-                  pharmacyOpen
-                      ? 'Pharmacy Open'
-                      : 'Pharmacy Closed',
-
+                  pharmacyOpen ? 'Pharmacy Open' : 'Pharmacy Closed',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: pharmacyOpen
-                        ? Colors.green.shade700
-                        : Colors.red.shade700,
+                    color: pharmacyOpen ? Colors.green.shade700 : Colors.red.shade700,
                   ),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 18),
-
-          // ------------------------------------------------------
-          // EDIT PROFILE
-          // ------------------------------------------------------
-
           SizedBox(
             width: double.infinity,
             height: 46,
-
             child: OutlinedButton.icon(
-              onPressed: () {
-                _showEditProfile();
-              },
-
-              icon: const Icon(
-                Icons.edit_outlined,
-                size: 18,
-              ),
-
-              label: const Text(
-                'Edit Profile',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
+              onPressed: _showEditProfile,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.black,
-
-                side: BorderSide(
-                  color: Colors.grey.shade300,
-                ),
-
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(13),
-                ),
+                foregroundColor: cs.onSurface,
+                side: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
               ),
             ),
           ),
@@ -363,342 +176,129 @@ class _PharmacyProfileScreenState
     );
   }
 
-  // ============================================================
-  // INFORMATION CARD
-  // ============================================================
-
-  Widget _buildInformationCard() {
-    return _sectionCard(
-      children: [
-        _informationRow(
-          icon: Icons.person_outline,
-          title: 'Pharmacist',
-          value: pharmacistName,
-        ),
-
-        _divider(),
-
-        _informationRow(
-          icon: Icons.phone_outlined,
-          title: 'Phone',
-          value: phone,
-        ),
-
-        _divider(),
-
-        _informationRow(
-          icon: Icons.email_outlined,
-          title: 'Email',
-          value: email,
-        ),
-
-        _divider(),
-
-        _informationRow(
-          icon: Icons.location_on_outlined,
-          title: 'Address',
-          value: address,
-        ),
-      ],
-    );
+  Widget _buildInformationCard(BuildContext context, ColorScheme cs, bool isDark) {
+    return _sectionCard(context, cs, isDark, children: [
+      _informationRow(icon: Icons.person_outline, title: 'Pharmacist', value: pharmacistName, cs: cs, isDark: isDark),
+      _divider(isDark),
+      _informationRow(icon: Icons.phone_outlined, title: 'Phone', value: phone, cs: cs, isDark: isDark),
+      _divider(isDark),
+      _informationRow(icon: Icons.email_outlined, title: 'Email', value: email, cs: cs, isDark: isDark),
+      _divider(isDark),
+      _informationRow(icon: Icons.location_on_outlined, title: 'Address', value: address, cs: cs, isDark: isDark),
+    ]);
   }
 
-  // ============================================================
-  // BUSINESS CARD
-  // ============================================================
-
-  Widget _buildBusinessCard() {
-    return _sectionCard(
-      children: [
-        _informationRow(
-          icon: Icons.badge_outlined,
-          title: 'License Number',
-          value: licenseNumber,
+  Widget _buildBusinessCard(BuildContext context, ColorScheme cs, bool isDark) {
+    return _sectionCard(context, cs, isDark, children: [
+      _informationRow(icon: Icons.badge_outlined, title: 'License Number', value: licenseNumber, cs: cs, isDark: isDark),
+      _divider(isDark),
+      _informationRow(icon: Icons.access_time_outlined, title: 'Opening Time', value: openingTime, cs: cs, isDark: isDark),
+      _divider(isDark),
+      _informationRow(icon: Icons.access_time_filled_outlined, title: 'Closing Time', value: closingTime, cs: cs, isDark: isDark),
+      _divider(isDark),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        secondary: Icon(Icons.storefront_outlined, color: cs.onSurfaceVariant),
+        title: Text('Pharmacy Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+        subtitle: Text(
+          pharmacyOpen ? 'Currently open' : 'Currently closed',
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
-
-        _divider(),
-
-        _informationRow(
-          icon: Icons.access_time_outlined,
-          title: 'Opening Time',
-          value: openingTime,
-        ),
-
-        _divider(),
-
-        _informationRow(
-          icon: Icons.access_time_filled_outlined,
-          title: 'Closing Time',
-          value: closingTime,
-        ),
-
-        _divider(),
-
-        // ------------------------------------------------------
-        // OPEN / CLOSED SWITCH
-        // ------------------------------------------------------
-
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-
-          secondary: Icon(
-            Icons.storefront_outlined,
-            color: Colors.grey.shade700,
-          ),
-
-          title: const Text(
-            'Pharmacy Status',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          subtitle: Text(
-            pharmacyOpen
-                ? 'Currently open'
-                : 'Currently closed',
-
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade500,
-            ),
-          ),
-
-          value: pharmacyOpen,
-
-          activeThumbColor: Colors.black,
-
-          onChanged: (value) {
-            setState(() {
-              pharmacyOpen = value;
-            });
-          },
-        ),
-      ],
-    );
+        value: pharmacyOpen,
+        activeThumbColor: cs.primary,
+        onChanged: (value) => setState(() => pharmacyOpen = value),
+      ),
+    ]);
   }
 
-  // ============================================================
-  // ACCOUNT CARD
-  // ============================================================
-
-  Widget _buildAccountCard() {
-    return _sectionCard(
-      children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-
-          leading: Icon(
-            Icons.lock_outline,
-            color: Colors.grey.shade700,
-          ),
-
-          title: const Text(
-            'Change Password',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          subtitle: Text(
-            'Update your account password',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade500,
-            ),
-          ),
-
-          trailing: const Icon(
-            Icons.chevron_right_rounded,
-          ),
-
-          onTap: () {
-            _showChangePassword();
-          },
+  Widget _buildAccountCard(BuildContext context, ColorScheme cs, bool isDark) {
+    return _sectionCard(context, cs, isDark, children: [
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.lock_outline, color: cs.onSurfaceVariant),
+        title: Text('Change Password', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+        subtitle: Text('Update your account password', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+        trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+        onTap: _showChangePassword,
+      ),
+      _divider(isDark),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        secondary: Icon(Icons.notifications_none_outlined, color: cs.onSurfaceVariant),
+        title: Text('Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+        subtitle: Text(
+          notificationsEnabled ? 'Notifications are enabled' : 'Notifications are disabled',
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
-
-        _divider(),
-
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-
-          secondary: Icon(
-            Icons.notifications_none_outlined,
-            color: Colors.grey.shade700,
-          ),
-
-          title: const Text(
-            'Notifications',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+        value: notificationsEnabled,
+        activeThumbColor: cs.primary,
+        onChanged: (value) => setState(() => notificationsEnabled = value),
+      ),
+      _divider(isDark),
+      BlocBuilder<ThemeBloc, ThemeState>(
+        builder: (context, themeState) {
+          final isDarkMode = themeState is ThemeDark;
+          return SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: Icon(
+              isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+              color: cs.onSurfaceVariant,
             ),
-          ),
-
-          subtitle: Text(
-            notificationsEnabled
-                ? 'Notifications are enabled'
-                : 'Notifications are disabled',
-
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade500,
+            title: Text('Dark Mode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+            subtitle: Text(
+              isDarkMode ? 'Dark theme active' : 'Light theme active',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
-          ),
-
-          value: notificationsEnabled,
-
-          activeThumbColor: Colors.black,
-
-          onChanged: (value) {
-            setState(() {
-              notificationsEnabled = value;
-            });
-          },
-        ),
-
-        _divider(),
-
-        // ------------------------------------------------------
-        // THEME TOGGLE
-        // ------------------------------------------------------
-
-        BlocBuilder<ThemeBloc, ThemeState>(
-          builder: (context, themeState) {
-            final isDark = themeState is ThemeDark;
-
-            return SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-
-              secondary: Icon(
-                isDark
-                    ? Icons.dark_mode_outlined
-                    : Icons.light_mode_outlined,
-                color: Colors.grey.shade700,
-              ),
-
-              title: const Text(
-                'Dark Mode',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              subtitle: Text(
-                isDark ? 'Dark theme active' : 'Light theme active',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-
-              value: isDark,
-
-              activeThumbColor: Colors.black,
-
-              onChanged: (_) {
-                context.read<ThemeBloc>().add(ThemeToggled());
-              },
-            );
-          },
-        ),
-      ],
-    );
+            value: isDarkMode,
+            activeThumbColor: cs.primary,
+            onChanged: (_) => context.read<ThemeBloc>().add(ThemeToggled()),
+          );
+        },
+      ),
+    ]);
   }
 
-  // ============================================================
-  // SECTION CARD
-  // ============================================================
-
-  Widget _sectionCard({
-    required List<Widget> children,
-  }) {
+  Widget _sectionCard(BuildContext context, ColorScheme cs, bool isDark, {required List<Widget> children}) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 6,
-      ),
-
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
       ),
-
-      child: Column(
-        children: children,
-      ),
+      child: Column(children: children),
     );
   }
-
-  // ============================================================
-  // INFORMATION ROW
-  // ============================================================
 
   Widget _informationRow({
     required IconData icon,
     required String title,
     required String value,
+    required ColorScheme cs,
+    required bool isDark,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 12,
-      ),
-
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 38,
             height: 38,
-
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius:
-              BorderRadius.circular(11),
+              color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(11),
             ),
-
-            child: Icon(
-              icon,
-              size: 19,
-              color: Colors.grey.shade700,
-            ),
+            child: Icon(icon, size: 19, color: cs.onSurfaceVariant),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-
+                Text(title, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
                 const SizedBox(height: 3),
-
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
               ],
             ),
           ),
@@ -707,246 +307,95 @@ class _PharmacyProfileScreenState
     );
   }
 
-  // ============================================================
-  // DIVIDER
-  // ============================================================
-
-  Widget _divider() {
-    return Divider(
-      height: 1,
-      color: Colors.grey.shade200,
-    );
+  Widget _divider(bool isDark) {
+    return Divider(height: 1, color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200);
   }
 
-  // ============================================================
-  // LOGOUT BUTTON
-  // ============================================================
-
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(ColorScheme cs, bool isDark) {
     return SizedBox(
       width: double.infinity,
       height: 50,
-
       child: OutlinedButton.icon(
-        onPressed: () {
-          _showLogoutConfirmation();
-        },
-
-        icon: Icon(
-          Icons.logout_rounded,
-          color: Colors.red.shade600,
-        ),
-
-        label: Text(
-          'Logout',
-          style: TextStyle(
-            color: Colors.red.shade600,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-
+        onPressed: _showLogoutConfirmation,
+        icon: Icon(Icons.logout_rounded, color: Colors.red.shade600),
+        label: Text('Logout', style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w600)),
         style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: Colors.red.shade200,
-          ),
-
-          backgroundColor: Colors.red.shade50,
-
-          shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(14),
-          ),
+          side: BorderSide(color: isDark ? const Color(0xFF2D1B1B) : Colors.red.shade200),
+          backgroundColor: isDark ? const Color(0xFF2D1B1B) : Colors.red.shade50,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );
   }
 
-  // ============================================================
-  // EDIT PROFILE
-  // ============================================================
-
   void _showEditProfile() {
-    final pharmacyCtrl =
-    TextEditingController(text: pharmacyName);
-
-    final pharmacistCtrl =
-    TextEditingController(text: pharmacistName);
-
-    final phoneCtrl =
-    TextEditingController(text: phone);
-
-    final emailCtrl =
-    TextEditingController(text: email);
-
-    final addressCtrl =
-    TextEditingController(text: address);
-
-    final licenseCtrl =
-    TextEditingController(text: licenseNumber);
+    final cs = Theme.of(context).colorScheme;
+    final pharmacyCtrl = TextEditingController(text: pharmacyName);
+    final pharmacistCtrl = TextEditingController(text: pharmacistName);
+    final phoneCtrl = TextEditingController(text: phone);
+    final emailCtrl = TextEditingController(text: email);
+    final addressCtrl = TextEditingController(text: address);
+    final licenseCtrl = TextEditingController(text: licenseNumber);
 
     showModalBottomSheet(
       context: context,
-
-      backgroundColor: Colors.white,
-
+      backgroundColor: Theme.of(context).cardColor,
       isScrollControlled: true,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(25),
-        ),
-      ),
-
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              MediaQuery.of(ctx)
-                  .viewInsets
-                  .bottom +
-                  24,
-            ),
-
+            padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
             child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
                     child: Container(
-                      width: 40,
-                      height: 4,
-
+                      width: 40, height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius:
-                        BorderRadius.circular(10),
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 20),
-
-                  const Text(
-                    'Edit Profile',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
+                  Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
                   const SizedBox(height: 20),
-
-                  _profileField(
-                    controller: pharmacyCtrl,
-                    label: 'Pharmacy Name',
-                    icon: Icons.local_pharmacy_outlined,
-                  ),
-
+                  _profileField(controller: pharmacyCtrl, label: 'Pharmacy Name', icon: Icons.local_pharmacy_outlined, context: context),
                   const SizedBox(height: 13),
-
-                  _profileField(
-                    controller: pharmacistCtrl,
-                    label: 'Pharmacist Name',
-                    icon: Icons.person_outline,
-                  ),
-
+                  _profileField(controller: pharmacistCtrl, label: 'Pharmacist Name', icon: Icons.person_outline, context: context),
                   const SizedBox(height: 13),
-
-                  _profileField(
-                    controller: phoneCtrl,
-                    label: 'Phone',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                  ),
-
+                  _profileField(controller: phoneCtrl, label: 'Phone', icon: Icons.phone_outlined, keyboardType: TextInputType.phone, context: context),
                   const SizedBox(height: 13),
-
-                  _profileField(
-                    controller: emailCtrl,
-                    label: 'Email',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-
+                  _profileField(controller: emailCtrl, label: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, context: context),
                   const SizedBox(height: 13),
-
-                  _profileField(
-                    controller: addressCtrl,
-                    label: 'Address',
-                    icon: Icons.location_on_outlined,
-                  ),
-
+                  _profileField(controller: addressCtrl, label: 'Address', icon: Icons.location_on_outlined, context: context),
                   const SizedBox(height: 13),
-
-                  _profileField(
-                    controller: licenseCtrl,
-                    label: 'License Number',
-                    icon: Icons.badge_outlined,
-                  ),
-
+                  _profileField(controller: licenseCtrl, label: 'License Number', icon: Icons.badge_outlined, context: context),
                   const SizedBox(height: 20),
-
                   SizedBox(
                     width: double.infinity,
                     height: 50,
-
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          pharmacyName =
-                              pharmacyCtrl.text.trim();
-
-                          pharmacistName =
-                              pharmacistCtrl.text.trim();
-
-                          phone =
-                              phoneCtrl.text.trim();
-
-                          email =
-                              emailCtrl.text.trim();
-
-                          address =
-                              addressCtrl.text.trim();
-
-                          licenseNumber =
-                              licenseCtrl.text.trim();
+                          pharmacyName = pharmacyCtrl.text.trim();
+                          pharmacistName = pharmacistCtrl.text.trim();
+                          phone = phoneCtrl.text.trim();
+                          email = emailCtrl.text.trim();
+                          address = addressCtrl.text.trim();
+                          licenseNumber = licenseCtrl.text.trim();
                         });
-
                         Navigator.pop(ctx);
-
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Profile updated.',
-                            ),
-                          ),
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
                       },
-
-                      style:
-                      ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cs.primary,
                         foregroundColor: Colors.white,
-
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(14),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-
-                      child: const Text(
-                        'Save Changes',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
@@ -958,191 +407,79 @@ class _PharmacyProfileScreenState
     );
   }
 
-  // ============================================================
-  // PROFILE FIELD
-  // ============================================================
-
   Widget _profileField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
-    TextInputType keyboardType =
-        TextInputType.text,
+    required BuildContext context,
+    TextInputType keyboardType = TextInputType.text,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-
+      style: TextStyle(color: cs.onSurface),
       decoration: InputDecoration(
         labelText: label,
-
-        prefixIcon: Icon(
-          icon,
-          color: Colors.grey.shade600,
-        ),
-
-        border: OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: Colors.grey.shade300,
-          ),
-        ),
-
-        enabledBorder: OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: Colors.grey.shade300,
-          ),
-        ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Colors.black,
-          ),
-        ),
+        labelStyle: TextStyle(color: cs.onSurfaceVariant),
+        prefixIcon: Icon(icon, color: cs.onSurfaceVariant),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
       ),
     );
   }
 
-  // ============================================================
-  // CHANGE PASSWORD
-  // ============================================================
-
   void _showChangePassword() {
-    final currentCtrl =
-    TextEditingController();
-
-    final newCtrl =
-    TextEditingController();
-
-    final confirmCtrl =
-    TextEditingController();
+    final cs = Theme.of(context).colorScheme;
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
-
-      backgroundColor: Colors.white,
-
+      backgroundColor: Theme.of(context).cardColor,
       isScrollControlled: true,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(25),
-        ),
-      ),
-
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              MediaQuery.of(ctx)
-                  .viewInsets
-                  .bottom +
-                  24,
-            ),
-
+            padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Change Password',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
+                Text('Change Password', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
                 const SizedBox(height: 20),
-
-                _passwordField(
-                  controller: currentCtrl,
-                  hint: 'Current password',
-                ),
-
+                _passwordField(controller: currentCtrl, hint: 'Current password', context: context),
                 const SizedBox(height: 13),
-
-                _passwordField(
-                  controller: newCtrl,
-                  hint: 'New password',
-                ),
-
+                _passwordField(controller: newCtrl, hint: 'New password', context: context),
                 const SizedBox(height: 13),
-
-                _passwordField(
-                  controller: confirmCtrl,
-                  hint: 'Confirm new password',
-                ),
-
+                _passwordField(controller: confirmCtrl, hint: 'Confirm new password', context: context),
                 const SizedBox(height: 20),
-
                 SizedBox(
                   width: double.infinity,
                   height: 50,
-
                   child: ElevatedButton(
                     onPressed: () {
-                      if (newCtrl.text.isEmpty ||
-                          confirmCtrl.text.isEmpty) {
+                      if (newCtrl.text.isEmpty || confirmCtrl.text.isEmpty) return;
+                      if (newCtrl.text != confirmCtrl.text) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
                         return;
                       }
-
-                      if (newCtrl.text !=
-                          confirmCtrl.text) {
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Passwords do not match.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
                       Navigator.pop(ctx);
-
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Password updated.',
-                          ),
-                        ),
-                      );
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated.')));
                     },
-
-                    style:
-                    ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.primary,
                       foregroundColor: Colors.white,
-
-                      shape:
-                      RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(14),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-
-                    child: const Text(
-                      'Update Password',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: const Text('Update Password', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
-
                 const SizedBox(height: 8),
               ],
             ),
@@ -1152,105 +489,51 @@ class _PharmacyProfileScreenState
     );
   }
 
-  // ============================================================
-  // PASSWORD FIELD
-  // ============================================================
-
   Widget _passwordField({
     required TextEditingController controller,
     required String hint,
+    required BuildContext context,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return TextField(
       controller: controller,
       obscureText: true,
-
+      style: TextStyle(color: cs.onSurface),
       decoration: InputDecoration(
         hintText: hint,
-
-        prefixIcon: const Icon(
-          Icons.lock_outline,
-        ),
-
-        border: OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(14),
-        ),
-
-        enabledBorder: OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: Colors.grey.shade300,
-          ),
-        ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Colors.black,
-          ),
-        ),
+        hintStyle: TextStyle(color: cs.onSurfaceVariant),
+        prefixIcon: Icon(Icons.lock_outline, color: cs.onSurfaceVariant),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
       ),
     );
   }
 
-  // ============================================================
-  // LOGOUT CONFIRMATION
-  // ============================================================
-
   void _showLogoutConfirmation() {
+    final cs = Theme.of(context).colorScheme;
+
     showDialog(
       context: context,
-
       builder: (ctx) {
         return AlertDialog(
-          title: const Text(
-            'Logout',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-
-          content: const Text(
-            'Are you sure you want to logout?',
-          ),
-
+          title: Text('Logout', style: TextStyle(fontWeight: FontWeight.w700, color: cs.onSurface)),
+          content: Text('Are you sure you want to logout?', style: TextStyle(color: cs.onSurfaceVariant)),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-              },
-
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.black,
-                ),
-              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant)),
             ),
-
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
-
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Logout functionality will be connected later.',
-                    ),
-                  ),
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Logout functionality will be connected later.')),
                 );
               },
-
-              child: Text(
-                'Logout',
-                style: TextStyle(
-                  color: Colors.red.shade600,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: Text('Logout', style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w600)),
             ),
           ],
         );
@@ -1258,189 +541,83 @@ class _PharmacyProfileScreenState
     );
   }
 
-  // ============================================================
-  // IMAGE OPTIONS
-  // ============================================================
-
   void _showImageOptions() {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
-
-      backgroundColor: Colors.white,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(25),
-        ),
-      ),
-
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              24,
-            ),
-
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-
               children: [
                 Center(
                   child: Container(
-                    width: 40,
-                    height: 4,
-
+                    width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius:
-                      BorderRadius.circular(10),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                const Text(
-                  'Profile Photo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
+                Text('Profile Photo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
                 const SizedBox(height: 20),
-
                 ListTile(
                   leading: Container(
-                    width: 40,
-                    height: 40,
-
+                    width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius:
-                      BorderRadius.circular(12),
+                      color: isDark ? const Color(0xFF1A2744) : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-
-                    child: Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.blue.shade600,
-                    ),
+                    child: Icon(Icons.camera_alt_outlined, color: Colors.blue.shade600),
                   ),
-
-                  title: const Text(
-                    'Take Photo',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  subtitle: Text(
-                    'Capture using camera',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-
+                  title: Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface)),
+                  subtitle: Text('Capture using camera', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _pickImage(ImageSource.camera);
                   },
                 ),
-
                 const SizedBox(height: 8),
-
                 ListTile(
                   leading: Container(
-                    width: 40,
-                    height: 40,
-
+                    width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius:
-                      BorderRadius.circular(12),
+                      color: isDark ? const Color(0xFF15301D) : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-
-                    child: Icon(
-                      Icons.photo_library_outlined,
-                      color: Colors.green.shade600,
-                    ),
+                    child: Icon(Icons.photo_library_outlined, color: Colors.green.shade600),
                   ),
-
-                  title: const Text(
-                    'Choose from Gallery',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  subtitle: Text(
-                    'Select from device',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-
+                  title: Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface)),
+                  subtitle: Text('Select from device', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _pickImage(ImageSource.gallery);
                   },
                 ),
-
                 if (_profileImage != null) ...[
                   const SizedBox(height: 8),
-
                   ListTile(
                     leading: Container(
-                      width: 40,
-                      height: 40,
-
+                      width: 40, height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius:
-                        BorderRadius.circular(12),
+                        color: isDark ? const Color(0xFF2D1B1B) : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-
-                      child: Icon(
-                        Icons.delete_outline,
-                        color: Colors.red.shade600,
-                      ),
+                      child: Icon(Icons.delete_outline, color: Colors.red.shade600),
                     ),
-
-                    title: Text(
-                      'Remove Photo',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red.shade600,
-                      ),
-                    ),
-
-                    subtitle: Text(
-                      'Delete profile photo',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-
+                    title: Text('Remove Photo', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red.shade600)),
+                    subtitle: Text('Delete profile photo', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                     onTap: () {
                       Navigator.pop(ctx);
-                      setState(() {
-                        _profileImage = null;
-                      });
-
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Profile photo removed.',
-                          ),
-                        ),
-                      );
+                      setState(() => _profileImage = null);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo removed.')));
                     },
                   ),
                 ],
@@ -1452,29 +629,12 @@ class _PharmacyProfileScreenState
     );
   }
 
-  // ============================================================
-  // PICK IMAGE
-  // ============================================================
-
   Future<void> _pickImage(ImageSource source) async {
-    final picked = await _picker.pickImage(
-      source: source,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 80,
-    );
-
+    final picked = await _picker.pickImage(source: source, maxWidth: 512, maxHeight: 512, imageQuality: 80);
     if (picked != null) {
-      setState(() {
-        _profileImage = File(picked.path);
-      });
-
+      setState(() => _profileImage = File(picked.path));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile photo updated.'),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
       }
     }
   }

@@ -12,118 +12,92 @@ class PharmacyMedicineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int stock = medicine['stock'] as int;
-    final int threshold =
-        (medicine['lowStockThreshold'] as int?) ?? 10;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
+    final int stock = medicine['stock'] as int;
+    final int threshold = (medicine['lowStockThreshold'] as int?) ?? 10;
     final bool lowStock = stock <= threshold;
 
     return Container(
       padding: const EdgeInsets.all(16),
-
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200,
         ),
       ),
-
       child: Column(
         children: [
           Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Medicine Icon
               Container(
                 width: 50,
                 height: 50,
-
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius:
-                  BorderRadius.circular(14),
+                  color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-
                 child: Icon(
                   Icons.medication_outlined,
-                  color: Colors.grey.shade700,
+                  color: cs.onSurfaceVariant,
                   size: 26,
                 ),
               ),
-
               const SizedBox(width: 13),
-
-              // Medicine Information
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       medicine['name'],
                       maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-
-                      style: const TextStyle(
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight:
-                        FontWeight.w700,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
                       ),
                     ),
-
                     const SizedBox(height: 4),
-
                     Text(
                       medicine['genericName'],
                       style: TextStyle(
                         fontSize: 12,
-                        color:
-                        Colors.grey.shade600,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
-
                     const SizedBox(height: 7),
-
                     Row(
                       children: [
-                        _tag(
-                          medicine['category'],
-                        ),
-
-                        if (medicine['prescription'] ==
-                            true) ...[
+                        _tag(context, medicine['category']),
+                        if (medicine['prescription'] == true) ...[
                           const SizedBox(width: 6),
-                          _tag('Rx'),
+                          _tag(context, 'Rx'),
                         ],
                       ],
                     ),
                   ],
                 ),
               ),
-
-              // Options
               IconButton(
                 onPressed: onOptionsTap,
-                icon: const Icon(
+                icon: Icon(
                   Icons.more_vert_rounded,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 14),
-
           Divider(
             height: 1,
-            color: Colors.grey.shade200,
+            color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200,
           ),
-
           const SizedBox(height: 14),
-
-          // Stock + Price
           Row(
             children: [
               Expanded(
@@ -132,64 +106,42 @@ class PharmacyMedicineCard extends StatelessWidget {
                     Icon(
                       Icons.inventory_2_outlined,
                       size: 17,
-
-                      color: lowStock
-                          ? Colors.red.shade600
-                          : Colors.grey.shade600,
+                      color: lowStock ? Colors.red.shade600 : cs.onSurfaceVariant,
                     ),
-
                     const SizedBox(width: 6),
-
                     Text(
                       'Stock: $stock',
-
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight:
-                        FontWeight.w600,
-
-                        color: lowStock
-                            ? Colors.red.shade600
-                            : Colors.grey.shade700,
+                        fontWeight: FontWeight.w600,
+                        color: lowStock ? Colors.red.shade600 : cs.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-
               Text(
                 '£${(medicine['price'] as num).toStringAsFixed(2)}',
-
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  fontWeight:
-                  FontWeight.w700,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
                 ),
               ),
             ],
           ),
-
-          // Low Stock Warning
           if (lowStock) ...[
             const SizedBox(height: 10),
-
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-                horizontal: 10,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: isDark ? const Color(0xFF2D1B1B) : Colors.red.shade50,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 17,
-                    color: Colors.red.shade600,
-                  ),
+                  Icon(Icons.warning_amber_rounded, size: 17, color: Colors.red.shade600),
                   const SizedBox(width: 7),
                   Text(
                     'Low stock — threshold: $threshold',
@@ -208,29 +160,22 @@ class PharmacyMedicineCard extends StatelessWidget {
     );
   }
 
-  Widget _tag(String text) {
+  Widget _tag(BuildContext context, String text) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding:
-      const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
-
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius:
-        BorderRadius.circular(7),
+        color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(7),
       ),
-
       child: Text(
         text,
-
         style: TextStyle(
           fontSize: 10,
-          fontWeight:
-          FontWeight.w600,
-          color:
-          Colors.grey.shade700,
+          fontWeight: FontWeight.w600,
+          color: cs.onSurfaceVariant,
         ),
       ),
     );

@@ -7,73 +7,53 @@ class PharmacyMedicineOptions {
     required VoidCallback onEdit,
     required VoidCallback onDelete,
   }) {
+    final cs = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
-
-      backgroundColor: Colors.white,
-
-      shape:
-      const RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.vertical(
-          top: Radius.circular(25),
-        ),
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
-
       builder: (context) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
-
             child: Column(
               mainAxisSize: MainAxisSize.min,
-
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   medicine['name'],
-
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
-                    fontWeight:
-                    FontWeight.w700,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.edit_outlined,
-                  ),
-
-                  title: const Text(
+                  leading: Icon(Icons.edit_outlined, color: cs.onSurfaceVariant),
+                  title: Text(
                     'Edit Medicine',
+                    style: TextStyle(color: cs.onSurface),
                   ),
-
                   onTap: () {
                     Navigator.pop(context);
                     onEdit();
                   },
                 ),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.delete_outline_rounded,
-                  ),
-
-                  title: const Text(
+                  leading: Icon(Icons.delete_outline_rounded, color: Colors.red.shade600),
+                  title: Text(
                     'Remove Medicine',
+                    style: TextStyle(color: Colors.red.shade600),
                   ),
-
                   onTap: () {
                     Navigator.pop(context);
                     onDelete();
                   },
                 ),
-
                 const SizedBox(height: 8),
               ],
             ),

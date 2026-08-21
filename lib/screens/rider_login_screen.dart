@@ -14,11 +14,6 @@ class RiderLoginScreen extends StatefulWidget {
 }
 
 class _RiderLoginScreenState extends State<RiderLoginScreen> {
-  static const Color primaryAccent = Color(0xFFE05333);
-  static const Color lightBackground = Color(0xFFEFF3F2);
-  static const Color darkText = Color(0xFF0F231F);
-  static const Color textMuted = Color(0xFF6B7280);
-
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -29,11 +24,15 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit(BuildContext context) {
     context.read<RiderLoginBloc>().add(RiderLoginSubmitted(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        ));
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    ));
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const RiderHomeScreen()),
+    );
   }
 
   double _scale(BuildContext context) {
@@ -51,8 +50,12 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
       create: (_) => RiderLoginBloc(),
       child: Builder(
         builder: (context) {
+          final theme = Theme.of(context);
+          final cs = theme.colorScheme;
+          final isDark = theme.brightness == Brightness.dark;
+
           return Scaffold(
-            backgroundColor: lightBackground,
+            backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
             body: SafeArea(
               child: BlocListener<RiderLoginBloc, RiderLoginState>(
                 listener: (context, state) {
@@ -60,19 +63,17 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Welcome back, ${state.rider.fullName}!'),
-                        backgroundColor: Colors.teal,
+                        backgroundColor: cs.primary,
                       ),
                     );
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                          builder: (_) => const RiderHomeScreen()),
-                      (route) => false,
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const RiderHomeScreen()),
                     );
                   } else if (state is RiderLoginFailure) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(state.message),
-                        backgroundColor: Colors.red,
+                        backgroundColor: cs.error,
                       ),
                     );
                   }
@@ -88,25 +89,22 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _buildTopBar(context),
-
+                          _buildTopBar(context, cs, isDark),
                           SizedBox(height: 20 * scale),
 
-                          // Rider Icon
                           Container(
                             width: 60 * scale,
                             height: 60 * scale,
                             decoration: BoxDecoration(
-                              color: primaryAccent.withValues(alpha: 0.1),
+                              color: cs.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.delivery_dining_rounded,
-                              color: primaryAccent,
+                              color: cs.primary,
                               size: 30 * scale,
                             ),
                           ),
-
                           SizedBox(height: 16 * scale),
 
                           Text(
@@ -115,17 +113,17 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                             style: TextStyle(
                               fontSize: 26 * scale,
                               fontWeight: FontWeight.w800,
-                              color: darkText,
+                              color: cs.onSurface,
                               letterSpacing: -0.5,
                             ),
                           ),
                           SizedBox(height: 6 * scale),
-                          const Text(
+                          Text(
                             'Welcome back! Sign in to start delivering.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
-                              color: textMuted,
+                              color: cs.onSurfaceVariant,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -133,17 +131,23 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                           SizedBox(height: 32 * scale),
 
                           _buildCustomTextField(
+                            context: context,
                             controller: _emailController,
                             hintText: 'you@email.co.uk',
                             icon: Icons.email_outlined,
                             keyboardType: TextInputType.emailAddress,
+                            isDark: isDark,
+                            cs: cs,
                           ),
                           SizedBox(height: 14 * scale),
                           _buildCustomTextField(
+                            context: context,
                             controller: _passwordController,
                             hintText: 'Password',
                             icon: Icons.lock_outline_rounded,
                             isPassword: true,
+                            isDark: isDark,
+                            cs: cs,
                           ),
 
                           SizedBox(height: 8 * scale),
@@ -152,10 +156,10 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () {},
-                              child: const Text(
+                              child: Text(
                                 'Forgot password?',
                                 style: TextStyle(
-                                  color: primaryAccent,
+                                  color: cs.primary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -172,17 +176,14 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                                 width: double.infinity,
                                 height: 54 * scale,
                                 child: ElevatedButton(
-                                  onPressed: isLoading ? null : _submit,
+                                  onPressed: isLoading ? null : () => _submit(context),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryAccent,
-                                    foregroundColor: Colors.white,
-                                    disabledBackgroundColor:
-                                        primaryAccent.withValues(alpha: 0.5),
-                                    elevation: 4,
-                                    shadowColor:
-                                        primaryAccent.withValues(alpha: 0.4),
+                                    backgroundColor: cs.primary,
+                                    foregroundColor: isDark ? const Color(0xFF0C1310) : Colors.white,
+                                    disabledBackgroundColor: cs.primary.withValues(alpha: 0.5),
+                                    elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(28),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),
                                   child: isLoading
@@ -191,8 +192,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                                           height: 22,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2.5,
-                                            color: Colors.white
-                                                .withValues(alpha: 0.9),
+                                            color: (isDark ? Colors.white : Colors.white).withValues(alpha: 0.9),
                                           ),
                                         )
                                       : Text(
@@ -213,17 +213,19 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                             alignment: WrapAlignment.center,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              const Text(
+                              Text(
                                 "Don't have an account? ",
                                 style: TextStyle(
-                                    color: textMuted, fontSize: 13.5),
+                                  color: cs.onSurfaceVariant,
+                                  fontSize: 13.5,
+                                ),
                               ),
                               GestureDetector(
                                 onTap: () => Navigator.pop(context),
-                                child: const Text(
+                                child: Text(
                                   'Sign up',
                                   style: TextStyle(
-                                    color: primaryAccent,
+                                    color: cs.primary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13.5,
                                   ),
@@ -245,7 +247,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     );
   }
 
-  Widget _buildTopBar(BuildContext context) {
+  Widget _buildTopBar(BuildContext context, ColorScheme cs, bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -253,13 +255,13 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
           onTap: () => Navigator.pop(context),
           child: Container(
             padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1D322A) : Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.chevron_left_rounded,
-              color: darkText,
+              color: cs.onSurface,
               size: 22,
             ),
           ),
@@ -267,15 +269,15 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1D322A) : Colors.white,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Text(
+          child: Text(
             'Rider account',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: textMuted,
+              color: cs.onSurfaceVariant,
             ),
           ),
         ),
@@ -284,25 +286,39 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
   }
 
   Widget _buildCustomTextField({
+    required BuildContext context,
     required TextEditingController controller,
     required String hintText,
     required IconData icon,
+    required bool isDark,
+    required ColorScheme cs,
     bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: isDark ? const Color(0xFF1D322A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+        ),
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword,
         keyboardType: keyboardType,
+        style: TextStyle(color: cs.onSurface, fontSize: 14),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-          prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
+          hintStyle: TextStyle(
+            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+            size: 20,
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 20,

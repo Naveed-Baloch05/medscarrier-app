@@ -6,6 +6,9 @@ class PharmacyOrder {
     required this.time,
     required this.status,
     required this.totalAmount,
+    this.items = const [],
+    this.riderName = '',
+    this.riderPhone = '',
   });
 
   final String id;
@@ -14,6 +17,9 @@ class PharmacyOrder {
   final String time;
   final String status;
   final double totalAmount;
+  final List<String> items;
+  final String riderName;
+  final String riderPhone;
 
   PharmacyOrder copyWith({
     String? id,
@@ -22,6 +28,9 @@ class PharmacyOrder {
     String? time,
     String? status,
     double? totalAmount,
+    List<String>? items,
+    String? riderName,
+    String? riderPhone,
   }) {
     return PharmacyOrder(
       id: id ?? this.id,
@@ -30,6 +39,9 @@ class PharmacyOrder {
       time: time ?? this.time,
       status: status ?? this.status,
       totalAmount: totalAmount ?? this.totalAmount,
+      items: items ?? this.items,
+      riderName: riderName ?? this.riderName,
+      riderPhone: riderPhone ?? this.riderPhone,
     );
   }
 }

@@ -20,37 +20,34 @@ class PharmacyOrderFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return SizedBox(
       height: 42,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: filters.length,
-        separatorBuilder: (_, __) {
-          return const SizedBox(width: 8);
-        },
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final filter = filters[index];
           final isSelected = filter == selectedStatus;
 
           return GestureDetector(
-            onTap: () {
-              onStatusSelected(filter);
-            },
+            onTap: () => onStatusSelected(filter),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Colors.black
-                    : Colors.white,
+                    ? cs.primary
+                    : (isDark ? const Color(0xFF131D19) : Colors.white),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isSelected
-                      ? Colors.black
-                      : Colors.grey.shade200,
+                      ? cs.primary
+                      : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
                 ),
               ),
               child: Text(
@@ -60,7 +57,7 @@ class PharmacyOrderFilter extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: isSelected
                       ? Colors.white
-                      : Colors.black87,
+                      : cs.onSurfaceVariant,
                 ),
               ),
             ),

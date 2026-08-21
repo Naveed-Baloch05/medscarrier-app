@@ -57,3 +57,17 @@ class PharmacyOrderDeleted extends PharmacyOrdersEvent {
 
   final String id;
 }
+
+class PharmacyOrderStatusChanged extends PharmacyOrdersEvent {
+  const PharmacyOrderStatusChanged({
+    required this.id,
+    required this.newStatus,
+    this.riderName = '',
+    this.riderPhone = '',
+  });
+
+  final String id;
+  final String newStatus;
+  final String riderName;
+  final String riderPhone;
+}
