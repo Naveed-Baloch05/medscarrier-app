@@ -1,11 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart'; // Added for haptic feedback
 import '../bloc/welcome/welcome_bloc.dart';
 import '../bloc/welcome/welcome_event.dart';
 import '../bloc/welcome/welcome_state.dart';
 import '../widgets/account_type_sheet.dart';
-class WelcomeScreen extends StatelessWidget {
+import '../admin/screens/admin_login_screen.dart'; // Import your admin login screen
+
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  int _adminTapCount = 0;
+  DateTime? _lastTapTime;
+
+  void _handleAdminSecretTap(BuildContext context) {
+    final now = DateTime.now();
+
+    // Reset tap count if taps are more than 1 second apart
+    if (_lastTapTime == null || now.difference(_lastTapTime!) > const Duration(seconds: 1)) {
+      _adminTapCount = 1;
+    } else {
+      _adminTapCount++;
+    }
+    _lastTapTime = now;
+
+    // Trigger Admin Access on 5th tap
+    if (_adminTapCount >= 5) {
+      _adminTapCount = 0;
+      HapticFeedback.mediumImpact(); // Subtle vibration feedback
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AdminLoginScreen(),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,23 +99,25 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              // 3. Header Text matching the target design
-              // 3. Header Text positioned directly above the rider
-              // 3. Header Text matching the target design
+
+              // 3. Header Text with Hidden Admin Trigger (Tap 5 times)
               Positioned(
                 top: MediaQuery.of(context).padding.top + 36,
                 left: 24,
                 right: 24,
-                child: const Text(
-                  'A Smarter Way\nto Get Your\nPrescriptions.',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(
-                    fontSize: 44,
-                    fontWeight: FontWeight.bold,
-                    // Translucent/off-white color from the mockup
-                    color: Color(0xD8FFFFFF), // ~85% opacity white
-                    height: 1.05,             // Tight line height
-                    letterSpacing: -1.0,       // Tight character spacing
+                child: GestureDetector(
+                  onTap: () => _handleAdminSecretTap(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: const Text(
+                    'A Smarter Way\nto Get Your\nPrescriptions.',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontSize: 44,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xD8FFFFFF), // ~85% opacity white
+                      height: 1.05,             // Tight line height
+                      letterSpacing: -1.0,       // Tight character spacing
+                    ),
                   ),
                 ),
               ),

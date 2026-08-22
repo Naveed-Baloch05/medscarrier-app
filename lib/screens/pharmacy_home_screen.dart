@@ -131,14 +131,7 @@ class _PharmacyHomeViewState extends State<_PharmacyHomeView> {
         }
 
         if (homeState is PharmacyHomeLoaded) {
-          return RefreshIndicator(
-            onRefresh: () async {
-              context
-                  .read<PharmacyHomeBloc>()
-                  .add(const PharmacyHomeRefreshed());
-              await Future.delayed(const Duration(milliseconds: 500));
-            },
-            child: CustomScrollView(
+          return CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 // Top section: header + toggle + filter tabs
@@ -331,8 +324,7 @@ class _PharmacyHomeViewState extends State<_PharmacyHomeView> {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
-            ),
-          );
+            );
         }
 
         return const SizedBox();

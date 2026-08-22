@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 
-class PharmacyNotificationsScreen extends StatelessWidget {
+class PharmacyNotificationsScreen extends StatefulWidget {
   const PharmacyNotificationsScreen({super.key});
 
+  @override
+  State<PharmacyNotificationsScreen> createState() => _PharmacyNotificationsScreenState();
+}
+
+class _PharmacyNotificationsScreenState extends State<PharmacyNotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -20,6 +25,10 @@ class PharmacyNotificationsScreen extends StatelessWidget {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface),
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
+            onPressed: () => setState(() {}),
+          ),
           TextButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(

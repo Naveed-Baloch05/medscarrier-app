@@ -64,6 +64,10 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
+            onPressed: () => setState(() {}),
+          ),
+          IconButton(
             onPressed: () => _showMedicineForm(context),
             icon: Icon(Icons.add_rounded, color: cs.onSurface),
           ),

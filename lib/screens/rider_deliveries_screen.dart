@@ -230,6 +230,12 @@ fontWeight: FontWeight.w700,
 color: Colors.black,
 ),
 ),
+actions: [
+IconButton(
+icon: const Icon(Icons.refresh_rounded, color: Colors.black),
+onPressed: () => setState(() {}),
+),
+],
 ),
 
 body: SafeArea(

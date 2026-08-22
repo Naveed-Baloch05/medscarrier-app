@@ -47,6 +47,12 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
           'Profile',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
+            onPressed: () => setState(() {}),
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(

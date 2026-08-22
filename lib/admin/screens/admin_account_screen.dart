@@ -4,52 +4,72 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../bloc/theme/theme_bloc.dart';
-import '../bloc/theme/theme_event.dart';
-import '../bloc/theme/theme_state.dart';
+import '../../bloc/theme/theme_bloc.dart';
+import '../../bloc/theme/theme_event.dart';
+import '../../bloc/theme/theme_state.dart';
 
-class RiderProfileScreen extends StatefulWidget {
-  const RiderProfileScreen({super.key});
+class AdminAccountScreen extends StatefulWidget {
+  const AdminAccountScreen({super.key});
 
   @override
-  State<RiderProfileScreen> createState() => _RiderProfileScreenState();
+  State<AdminAccountScreen> createState() => _AdminAccountScreenState();
 }
 
-class _RiderProfileScreenState extends State<RiderProfileScreen> {
-  String riderName = 'Muhammad Ahmed';
-  String riderId = 'RDR-1025';
+class _AdminAccountScreenState extends State<AdminAccountScreen> {
+  String adminName = 'Admin User';
   String phone = '+92 300 1234567';
-  String email = 'rider@medcareer.com';
+  String email = 'admin@medscarrier.com';
 
   bool notificationsEnabled = true;
-  bool _isOnline = true;
-
-  final int totalDeliveries = 128;
-  final int completedDeliveries = 121;
-  final double rating = 4.8;
 
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bgColor = isDark
+        ? const Color(0xFF08100C)
+        : const Color(0xFFF2F5F3);
+
+    final cardColor = isDark
+        ? const Color(0xFF0E1A14)
+        : Colors.white;
+
+    final textPrimary = isDark
+        ? Colors.white
+        : const Color(0xFF191C1B);
+
+    final textSecondary = isDark
+        ? const Color(0xFF8B9B94)
+        : const Color(0xFF6E7A75);
+
+    final primaryColor = isDark
+        ? const Color(0xFF32C787)
+        : const Color(0xFF0F7253);
+
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
+        backgroundColor: bgColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
-          'Profile',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface),
+          'Account',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
+            icon: Icon(Icons.refresh_rounded, color: textPrimary),
             onPressed: () => setState(() {}),
           ),
         ],
@@ -58,40 +78,45 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
           children: [
-            _buildProfileHeader(context, cs, isDark),
-            const SizedBox(height: 18),
-            _buildStatistics(context, cs, isDark),
+            _buildProfileHeader(cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark),
             const SizedBox(height: 22),
-            _sectionTitle('Personal Information', cs),
+            _sectionTitle('Personal Information', textPrimary),
             const SizedBox(height: 12),
-            _buildInformationCard(context, cs, isDark),
+            _buildInformationCard(cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark),
             const SizedBox(height: 22),
-            _sectionTitle('Account', cs),
+            _sectionTitle('Account', textPrimary),
             const SizedBox(height: 12),
-            _buildAccountCard(context, cs, isDark),
+            _buildAccountCard(cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark),
             const SizedBox(height: 22),
-            _sectionTitle('Support', cs),
+            _sectionTitle('Support', textPrimary),
             const SizedBox(height: 12),
-            _buildSupportCard(context, cs, isDark),
+            _buildSupportCard(cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark),
             const SizedBox(height: 22),
-            _buildLogoutButton(cs, isDark),
+            _buildLogoutButton(isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _sectionTitle(String title, ColorScheme cs) {
-    return Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface));
+  Widget _sectionTitle(String title, Color textPrimary) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: textPrimary,
+      ),
+    );
   }
 
-  Widget _buildProfileHeader(BuildContext context, ColorScheme cs, bool isDark) {
+  Widget _buildProfileHeader(Color cardColor, Color borderColor, Color textPrimary, Color textSecondary, Color primaryColor, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         children: [
@@ -103,13 +128,15 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                   width: 78,
                   height: 78,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
+                    color: isDark
+                        ? const Color(0xFF18251F)
+                        : const Color(0xFFE8F5E9),
                     shape: BoxShape.circle,
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: _profileImage != null
                       ? Image.file(_profileImage!, fit: BoxFit.cover)
-                      : Icon(Icons.person_rounded, size: 38, color: cs.onSurfaceVariant),
+                      : Icon(Icons.admin_panel_settings_outlined, size: 38, color: primaryColor),
                 ),
                 Positioned(
                   bottom: 0,
@@ -118,9 +145,9 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: cs.primary,
+                      color: primaryColor,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Theme.of(context).cardColor, width: 2),
+                      border: Border.all(color: cardColor, width: 2),
                     ),
                     child: const Icon(Icons.camera_alt_outlined, size: 14, color: Colors.white),
                   ),
@@ -129,16 +156,16 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Text(riderName, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
+          Text(adminName, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimary)),
           const SizedBox(height: 5),
-          Text('Rider ID: $riderId', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+          Text(email, style: TextStyle(fontSize: 13, color: textSecondary)),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: _isOnline
-                  ? (isDark ? const Color(0xFF15301D) : Colors.green.shade50)
-                  : (isDark ? const Color(0xFF2D1B1B) : Colors.red.shade50),
+              color: isDark
+                  ? const Color(0xFF15301D)
+                  : const Color(0xFFE8F5E9),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -148,17 +175,17 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: _isOnline ? Colors.green.shade600 : Colors.red.shade600,
+                    color: primaryColor,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 7),
                 Text(
-                  _isOnline ? 'Active Rider' : 'Offline',
+                  'Admin',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _isOnline ? Colors.green.shade700 : Colors.red.shade700,
+                    color: primaryColor,
                   ),
                 ),
               ],
@@ -173,8 +200,8 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
               icon: const Icon(Icons.edit_outlined, size: 18),
               label: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
-                foregroundColor: cs.onSurface,
-                side: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300),
+                foregroundColor: textPrimary,
+                side: BorderSide(color: borderColor),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
               ),
             ),
@@ -184,87 +211,42 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     );
   }
 
-  Widget _buildStatistics(BuildContext context, ColorScheme cs, bool isDark) {
-    return Row(
-      children: [
-        Expanded(child: _statCard(icon: Icons.local_shipping_outlined, value: '$totalDeliveries', label: 'Total', cs: cs, isDark: isDark)),
-        const SizedBox(width: 10),
-        Expanded(child: _statCard(icon: Icons.check_circle_outline_rounded, value: '$completedDeliveries', label: 'Completed', cs: cs, isDark: isDark)),
-        const SizedBox(width: 10),
-        Expanded(child: _statCard(icon: Icons.star_outline_rounded, value: rating.toString(), label: 'Rating', cs: cs, isDark: isDark)),
-      ],
-    );
-  }
-
-  Widget _statCard({required IconData icon, required String value, required String label, required ColorScheme cs, required bool isDark}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 15),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 21, color: cs.onSurfaceVariant),
-          const SizedBox(height: 7),
-          Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: cs.onSurface)),
-          const SizedBox(height: 2),
-          Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInformationCard(BuildContext context, ColorScheme cs, bool isDark) {
-    return _sectionCard(context, cs, isDark, children: [
-      _informationRow(icon: Icons.person_outline, title: 'Full Name', value: riderName, cs: cs, isDark: isDark),
-      _divider(isDark),
-      _informationRow(icon: Icons.badge_outlined, title: 'Rider ID', value: riderId, cs: cs, isDark: isDark),
-      _divider(isDark),
-      _informationRow(icon: Icons.phone_outlined, title: 'Phone', value: phone, cs: cs, isDark: isDark),
-      _divider(isDark),
-      _informationRow(icon: Icons.email_outlined, title: 'Email', value: email, cs: cs, isDark: isDark),
+  Widget _buildInformationCard(Color cardColor, Color borderColor, Color textPrimary, Color textSecondary, Color primaryColor, bool isDark) {
+    return _sectionCard(cardColor, borderColor, [
+      _informationRow(icon: Icons.person_outline, title: 'Full Name', value: adminName, textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, isDark: isDark),
+      _divider(borderColor),
+      _informationRow(icon: Icons.phone_outlined, title: 'Phone', value: phone, textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, isDark: isDark),
+      _divider(borderColor),
+      _informationRow(icon: Icons.email_outlined, title: 'Email', value: email, textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, isDark: isDark),
+      _divider(borderColor),
+      _informationRow(icon: Icons.admin_panel_settings_outlined, title: 'Role', value: 'Administrator', textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, isDark: isDark),
     ]);
   }
 
-  Widget _buildAccountCard(BuildContext context, ColorScheme cs, bool isDark) {
-    return _sectionCard(context, cs, isDark, children: [
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        secondary: Icon(Icons.local_shipping_outlined, color: cs.onSurfaceVariant),
-        title: Text('Rider Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
-        subtitle: Text(
-          _isOnline ? 'Currently active and receiving orders' : 'Currently offline',
-          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-        ),
-        value: _isOnline,
-        activeThumbColor: cs.primary,
-        onChanged: (value) => setState(() => _isOnline = value),
-      ),
-      _divider(isDark),
+  Widget _buildAccountCard(Color cardColor, Color borderColor, Color textPrimary, Color textSecondary, Color primaryColor, bool isDark) {
+    return _sectionCard(cardColor, borderColor, [
       ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.lock_outline, color: cs.onSurfaceVariant),
-        title: Text('Change Password', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
-        subtitle: Text('Update your account password', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-        trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+        leading: Icon(Icons.lock_outline, color: textSecondary),
+        title: Text('Change Password', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary)),
+        subtitle: Text('Update your account password', style: TextStyle(fontSize: 12, color: textSecondary)),
+        trailing: Icon(Icons.chevron_right_rounded, color: textSecondary),
         onTap: _showChangePassword,
       ),
-      _divider(isDark),
+      _divider(borderColor),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        secondary: Icon(Icons.notifications_none_outlined, color: cs.onSurfaceVariant),
-        title: Text('Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+        secondary: Icon(Icons.notifications_none_outlined, color: textSecondary),
+        title: Text('Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary)),
         subtitle: Text(
           notificationsEnabled ? 'Notifications are enabled' : 'Notifications are disabled',
-          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          style: TextStyle(fontSize: 12, color: textSecondary),
         ),
         value: notificationsEnabled,
-        activeThumbColor: cs.primary,
+        activeThumbColor: primaryColor,
         onChanged: (value) => setState(() => notificationsEnabled = value),
       ),
-      _divider(isDark),
+      _divider(borderColor),
       BlocBuilder<ThemeBloc, ThemeState>(
         builder: (context, themeState) {
           final isDarkMode = themeState is ThemeDark;
@@ -272,15 +254,15 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
             contentPadding: EdgeInsets.zero,
             secondary: Icon(
               isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-              color: cs.onSurfaceVariant,
+              color: textSecondary,
             ),
-            title: Text('Dark Mode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+            title: Text('Dark Mode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary)),
             subtitle: Text(
               isDarkMode ? 'Dark theme active' : 'Light theme active',
-              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12, color: textSecondary),
             ),
             value: isDarkMode,
-            activeThumbColor: cs.primary,
+            activeThumbColor: primaryColor,
             onChanged: (_) => context.read<ThemeBloc>().add(ThemeToggled()),
           );
         },
@@ -288,43 +270,43 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     ]);
   }
 
-  Widget _buildSupportCard(BuildContext context, ColorScheme cs, bool isDark) {
-    return _sectionCard(context, cs, isDark, children: [
+  Widget _buildSupportCard(Color cardColor, Color borderColor, Color textPrimary, Color textSecondary, Color primaryColor, bool isDark) {
+    return _sectionCard(cardColor, borderColor, [
       ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.help_outline, color: cs.onSurfaceVariant),
-        title: Text('Help & Support', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
-        subtitle: Text('Get help with your deliveries', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-        trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+        leading: Icon(Icons.help_outline, color: textSecondary),
+        title: Text('Help & Support', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary)),
+        subtitle: Text('Get help with the admin panel', style: TextStyle(fontSize: 12, color: textSecondary)),
+        trailing: Icon(Icons.chevron_right_rounded, color: textSecondary),
         onTap: () {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help & Support will be connected later.')));
         },
       ),
-      _divider(isDark),
+      _divider(borderColor),
       ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-        title: Text('About MedCareer', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
-        subtitle: Text('App information', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-        trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+        leading: Icon(Icons.info_outline, color: textSecondary),
+        title: Text('About MedsCarrier', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary)),
+        subtitle: Text('App information', style: TextStyle(fontSize: 12, color: textSecondary)),
+        trailing: Icon(Icons.chevron_right_rounded, color: textSecondary),
         onTap: _showAboutDialog,
       ),
     ]);
   }
 
-  Widget _sectionCard(BuildContext context, ColorScheme cs, bool isDark, {required List<Widget> children}) {
+  Widget _sectionCard(Color cardColor, Color borderColor, List<Widget> children) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
+        border: Border.all(color: borderColor),
       ),
       child: Column(children: children),
     );
   }
 
-  Widget _informationRow({required IconData icon, required String title, required String value, required ColorScheme cs, required bool isDark}) {
+  Widget _informationRow({required IconData icon, required String title, required String value, required Color textPrimary, required Color textSecondary, required Color primaryColor, required bool isDark}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
@@ -334,19 +316,21 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
+              color: isDark
+                  ? const Color(0xFF18251F)
+                  : const Color(0xFFE8F5E9),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(icon, size: 19, color: cs.onSurfaceVariant),
+            child: Icon(icon, size: 19, color: primaryColor),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+                Text(title, style: TextStyle(fontSize: 11, color: textSecondary)),
                 const SizedBox(height: 3),
-                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textPrimary)),
               ],
             ),
           ),
@@ -355,11 +339,11 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     );
   }
 
-  Widget _divider(bool isDark) {
-    return Divider(height: 1, color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200);
+  Widget _divider(Color borderColor) {
+    return Divider(height: 1, color: borderColor);
   }
 
-  Widget _buildLogoutButton(ColorScheme cs, bool isDark) {
+  Widget _buildLogoutButton(bool isDark) {
     return SizedBox(
       width: double.infinity,
       height: 50,
@@ -377,14 +361,20 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
   }
 
   void _showEditProfile() {
-    final cs = Theme.of(context).colorScheme;
-    final nameCtrl = TextEditingController(text: riderName);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF0E1A14) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
+    final textSecondary = isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75);
+    final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
+
+    final nameCtrl = TextEditingController(text: adminName);
     final phoneCtrl = TextEditingController(text: phone);
     final emailCtrl = TextEditingController(text: email);
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).cardColor,
+      backgroundColor: cardColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
@@ -399,19 +389,19 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                     child: Container(
                       width: 40, height: 4,
                       decoration: BoxDecoration(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                        color: textSecondary.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                  Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimary)),
                   const SizedBox(height: 20),
-                  _profileField(controller: nameCtrl, label: 'Full Name', icon: Icons.person_outline, context: context),
+                  _profileField(controller: nameCtrl, label: 'Full Name', icon: Icons.person_outline, textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, borderColor: borderColor),
                   const SizedBox(height: 13),
-                  _profileField(controller: phoneCtrl, label: 'Phone', icon: Icons.phone_outlined, keyboardType: TextInputType.phone, context: context),
+                  _profileField(controller: phoneCtrl, label: 'Phone', icon: Icons.phone_outlined, keyboardType: TextInputType.phone, textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, borderColor: borderColor),
                   const SizedBox(height: 13),
-                  _profileField(controller: emailCtrl, label: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, context: context),
+                  _profileField(controller: emailCtrl, label: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, textPrimary: textPrimary, textSecondary: textSecondary, primaryColor: primaryColor, borderColor: borderColor),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -419,7 +409,7 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          riderName = nameCtrl.text.trim();
+                          adminName = nameCtrl.text.trim();
                           phone = phoneCtrl.text.trim();
                           email = emailCtrl.text.trim();
                         });
@@ -427,7 +417,7 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
+                        backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
@@ -443,34 +433,36 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     );
   }
 
-  Widget _profileField({required TextEditingController controller, required String label, required IconData icon, required BuildContext context, TextInputType keyboardType = TextInputType.text}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  Widget _profileField({required TextEditingController controller, required String label, required IconData icon, TextInputType keyboardType = TextInputType.text, required Color textPrimary, required Color textSecondary, required Color primaryColor, required Color borderColor}) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: TextStyle(color: cs.onSurface),
+      style: TextStyle(color: textPrimary),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: cs.onSurfaceVariant),
-        prefixIcon: Icon(icon, color: cs.onSurfaceVariant),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
+        labelStyle: TextStyle(color: textSecondary),
+        prefixIcon: Icon(icon, color: textSecondary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: primaryColor)),
       ),
     );
   }
 
   void _showChangePassword() {
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF0E1A14) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
+    final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
+
     final currentCtrl = TextEditingController();
     final newCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).cardColor,
+      backgroundColor: cardColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
@@ -481,13 +473,13 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Change Password', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                Text('Change Password', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimary)),
                 const SizedBox(height: 20),
-                _passwordField(controller: currentCtrl, hint: 'Current password', context: context),
+                _passwordField(controller: currentCtrl, hint: 'Current password', textPrimary: textPrimary, primaryColor: primaryColor, borderColor: borderColor),
                 const SizedBox(height: 13),
-                _passwordField(controller: newCtrl, hint: 'New password', context: context),
+                _passwordField(controller: newCtrl, hint: 'New password', textPrimary: textPrimary, primaryColor: primaryColor, borderColor: borderColor),
                 const SizedBox(height: 13),
-                _passwordField(controller: confirmCtrl, hint: 'Confirm new password', context: context),
+                _passwordField(controller: confirmCtrl, hint: 'Confirm new password', textPrimary: textPrimary, primaryColor: primaryColor, borderColor: borderColor),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -503,7 +495,7 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated.')));
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.primary,
+                      backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -519,38 +511,39 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     );
   }
 
-  Widget _passwordField({required TextEditingController controller, required String hint, required BuildContext context}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  Widget _passwordField({required TextEditingController controller, required String hint, required Color textPrimary, required Color primaryColor, required Color borderColor}) {
     return TextField(
       controller: controller,
       obscureText: true,
-      style: TextStyle(color: cs.onSurface),
+      style: TextStyle(color: textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: cs.onSurfaceVariant),
-        prefixIcon: Icon(Icons.lock_outline, color: cs.onSurfaceVariant),
+        hintStyle: TextStyle(color: textPrimary.withValues(alpha: 0.4)),
+        prefixIcon: Icon(Icons.lock_outline, color: textPrimary.withValues(alpha: 0.5)),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: primaryColor)),
       ),
     );
   }
 
   void _showLogoutConfirmation() {
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF0E1A14) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
+    final textSecondary = isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75);
 
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text('Logout', style: TextStyle(fontWeight: FontWeight.w700, color: cs.onSurface)),
-          content: Text('Are you sure you want to logout?', style: TextStyle(color: cs.onSurfaceVariant)),
+          backgroundColor: cardColor,
+          title: Text('Logout', style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
+          content: Text('Are you sure you want to logout?', style: TextStyle(color: textSecondary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant)),
+              child: Text('Cancel', style: TextStyle(color: textSecondary)),
             ),
             TextButton(
               onPressed: () {
@@ -568,26 +561,31 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
   }
 
   void _showAboutDialog() {
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textSecondary = isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75);
+
     showAboutDialog(
       context: context,
-      applicationName: 'MedCareer',
+      applicationName: 'MedsCarrier',
       applicationVersion: '1.0.0',
-      applicationLegalese: '© 2026 MedCareer',
+      applicationLegalese: '\u00a9 2026 MedsCarrier',
       children: [
         const SizedBox(height: 12),
-        Text('MedCareer helps riders manage pharmacy medicine deliveries safely and efficiently.', style: TextStyle(color: cs.onSurfaceVariant)),
+        Text('MedsCarrier Admin Panel for managing pharmacies, riders, and orders.', style: TextStyle(color: textSecondary)),
       ],
     );
   }
 
   void _showImageOptions() {
-    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF0E1A14) : Colors.white;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
+    final textSecondary = isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75);
+    final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).cardColor,
+      backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
         return SafeArea(
@@ -600,25 +598,25 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                   child: Container(
                     width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                      color: textSecondary.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text('Profile Photo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                Text('Profile Photo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimary)),
                 const SizedBox(height: 20),
                 ListTile(
                   leading: Container(
                     width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1A2744) : Colors.blue.shade50,
+                      color: isDark ? const Color(0xFF18251F) : const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.camera_alt_outlined, color: Colors.blue.shade600),
+                    child: Icon(Icons.camera_alt_outlined, color: primaryColor),
                   ),
-                  title: Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface)),
-                  subtitle: Text('Capture using camera', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  title: Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary)),
+                  subtitle: Text('Capture using camera', style: TextStyle(fontSize: 12, color: textSecondary)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _pickImage(ImageSource.camera);
@@ -629,13 +627,13 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                   leading: Container(
                     width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF15301D) : Colors.green.shade50,
+                      color: isDark ? const Color(0xFF18251F) : const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.photo_library_outlined, color: Colors.green.shade600),
+                    child: Icon(Icons.photo_library_outlined, color: primaryColor),
                   ),
-                  title: Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface)),
-                  subtitle: Text('Select from device', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  title: Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary)),
+                  subtitle: Text('Select from device', style: TextStyle(fontSize: 12, color: textSecondary)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _pickImage(ImageSource.gallery);
@@ -653,7 +651,7 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                       child: Icon(Icons.delete_outline, color: Colors.red.shade600),
                     ),
                     title: Text('Remove Photo', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red.shade600)),
-                    subtitle: Text('Delete profile photo', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                    subtitle: Text('Delete profile photo', style: TextStyle(fontSize: 12, color: textSecondary)),
                     onTap: () {
                       Navigator.pop(ctx);
                       setState(() => _profileImage = null);

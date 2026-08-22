@@ -19,6 +19,7 @@ class _AdminPharmacyManagementScreenState
 
   final List<Map<String, dynamic>> _pharmacies = [
     {
+      'id': 'PH-1001',
       'name': 'MedCare Pharmacy',
       'pharmacist': 'Naveed Baloch',
       'phone': '+92 300 1234567',
@@ -29,6 +30,7 @@ class _AdminPharmacyManagementScreenState
       'active': true,
     },
     {
+      'id': 'PH-1002',
       'name': 'City Pharmacy',
       'pharmacist': 'Ahmed Khan',
       'phone': '+92 301 9876543',
@@ -39,6 +41,7 @@ class _AdminPharmacyManagementScreenState
       'active': false,
     },
     {
+      'id': 'PH-1003',
       'name': 'HealthCare Pharmacy',
       'pharmacist': 'Ali Raza',
       'phone': '+92 302 4567890',
@@ -48,9 +51,61 @@ class _AdminPharmacyManagementScreenState
       'status': 'Approved',
       'active': true,
     },
+    {
+      'id': 'PH-1004',
+      'name': 'Green Life Pharmacy',
+      'pharmacist': 'Usman Khan',
+      'phone': '+92 303 1112233',
+      'email': 'greenlife@example.com',
+      'address': 'Johar Town, Lahore',
+      'license': 'PH-2026-00128',
+      'status': 'Rejected',
+      'active': false,
+    },
   ];
 
   String _selectedFilter = 'All';
+  String _searchQuery = '';
+
+  // ============================================================
+  // COLORS
+  // ============================================================
+
+  Color _backgroundColor(bool isDark) {
+    return isDark
+        ? const Color(0xFF08100C)
+        : const Color(0xFFF2F5F3);
+  }
+
+  Color _cardColor(bool isDark) {
+    return isDark
+        ? const Color(0xFF0E1A14)
+        : Colors.white;
+  }
+
+  Color _primaryColor(bool isDark) {
+    return isDark
+        ? const Color(0xFF32C787)
+        : const Color(0xFF0F7253);
+  }
+
+  Color _primaryText(bool isDark) {
+    return isDark
+        ? Colors.white
+        : const Color(0xFF191C1B);
+  }
+
+  Color _secondaryText(bool isDark) {
+    return isDark
+        ? const Color(0xFF8B9B94)
+        : const Color(0xFF6E7A75);
+  }
+
+  Color _borderColor(bool isDark) {
+    return isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.05);
+  }
 
   // ============================================================
   // BUILD
@@ -58,49 +113,62 @@ class _AdminPharmacyManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final filteredPharmacies = _filteredPharmacies();
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
+    final filteredPharmacies =
+    _filteredPharmacies();
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: _backgroundColor(isDark),
 
-      // ==========================================================
+      // ========================================================
       // APP BAR
-      // ==========================================================
+      // ========================================================
 
       appBar: AppBar(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: _backgroundColor(isDark),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
 
-        title: const Text(
-          'Pharmacies',
+        iconTheme: IconThemeData(
+          color: _primaryText(isDark),
+        ),
+
+        title: Text(
+          'Pharmacy Management',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 21,
             fontWeight: FontWeight.w700,
-            color: Colors.black,
+            color: _primaryText(isDark),
           ),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: _primaryText(isDark)),
+            onPressed: () => setState(() {}),
+          ),
+        ],
       ),
 
-      // ==========================================================
+      // ========================================================
       // BODY
-      // ==========================================================
+      // ========================================================
 
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            20,
+            16,
             8,
-            20,
+            16,
             30,
           ),
           children: [
-
             // ====================================================
             // SUMMARY
             // ====================================================
 
-            _buildSummary(),
+            _buildSummary(isDark),
 
             const SizedBox(height: 22),
 
@@ -108,7 +176,7 @@ class _AdminPharmacyManagementScreenState
             // SEARCH
             // ====================================================
 
-            _buildSearchField(),
+            _buildSearchField(isDark),
 
             const SizedBox(height: 14),
 
@@ -116,16 +184,44 @@ class _AdminPharmacyManagementScreenState
             // FILTERS
             // ====================================================
 
-            _buildFilters(),
+            _buildFilters(isDark),
 
             const SizedBox(height: 18),
 
             // ====================================================
-            // PHARMACY LIST
+            // PHARMACY COUNT
+            // ====================================================
+
+            Row(
+              mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Pharmacies',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _primaryText(isDark),
+                  ),
+                ),
+                Text(
+                  '${filteredPharmacies.length} found',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _secondaryText(isDark),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // ====================================================
+            // LIST
             // ====================================================
 
             if (filteredPharmacies.isEmpty)
-              _buildEmptyState()
+              _buildEmptyState(isDark)
             else
               ...filteredPharmacies.map(
                     (pharmacy) => Padding(
@@ -134,6 +230,7 @@ class _AdminPharmacyManagementScreenState
                   ),
                   child: _buildPharmacyCard(
                     pharmacy,
+                    isDark,
                   ),
                 ),
               ),
@@ -147,7 +244,7 @@ class _AdminPharmacyManagementScreenState
   // SUMMARY
   // ============================================================
 
-  Widget _buildSummary() {
+  Widget _buildSummary(bool isDark) {
     final total = _pharmacies.length;
 
     final approved = _pharmacies
@@ -164,33 +261,48 @@ class _AdminPharmacyManagementScreenState
     )
         .length;
 
+    final active = _pharmacies
+        .where(
+          (pharmacy) =>
+      pharmacy['active'] == true,
+    )
+        .length;
+
     return Row(
       children: [
         Expanded(
           child: _summaryCard(
+            isDark: isDark,
             icon: Icons.local_pharmacy_outlined,
             title: 'Total',
             value: '$total',
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(width: 8),
         Expanded(
           child: _summaryCard(
+            isDark: isDark,
             icon: Icons.check_circle_outline_rounded,
             title: 'Approved',
             value: '$approved',
           ),
         ),
-
-        const SizedBox(width: 10),
-
+        const SizedBox(width: 8),
         Expanded(
           child: _summaryCard(
+            isDark: isDark,
             icon: Icons.pending_outlined,
             title: 'Pending',
             value: '$pending',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _summaryCard(
+            isDark: isDark,
+            icon: Icons.circle_outlined,
+            title: 'Active',
+            value: '$active',
           ),
         ),
       ],
@@ -202,49 +314,44 @@ class _AdminPharmacyManagementScreenState
   // ============================================================
 
   Widget _summaryCard({
+    required bool isDark,
     required IconData icon,
     required String title,
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
-
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-
+        color: _cardColor(isDark),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: _borderColor(isDark),
         ),
       ),
-
       child: Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
           Icon(
             icon,
-            size: 19,
-            color: Colors.grey.shade700,
+            size: 18,
+            color: _primaryColor(isDark),
           ),
-
-          const SizedBox(height: 8),
-
+          const SizedBox(height: 7),
           Text(
             title,
             style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey.shade500,
+              fontSize: 9,
+              color: _secondaryText(isDark),
             ),
           ),
-
           const SizedBox(height: 2),
-
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 18,
+            style: TextStyle(
+              fontSize: 17,
               fontWeight: FontWeight.w700,
+              color: _primaryText(isDark),
             ),
           ),
         ],
@@ -256,42 +363,78 @@ class _AdminPharmacyManagementScreenState
   // SEARCH
   // ============================================================
 
-  Widget _buildSearchField() {
+  Widget _buildSearchField(bool isDark) {
     return TextField(
-      decoration: InputDecoration(
-        hintText: 'Search pharmacy...',
+      style: TextStyle(
+        color: _primaryText(isDark),
+        fontSize: 13,
+      ),
 
-        prefixIcon: const Icon(
-          Icons.search_rounded,
+      cursorColor: _primaryColor(isDark),
+
+      decoration: InputDecoration(
+        hintText: 'Search pharmacy, pharmacist or license...',
+        hintStyle: TextStyle(
+          color: _secondaryText(isDark),
+          fontSize: 12,
         ),
 
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: _secondaryText(isDark),
+        ),
+
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+          icon: Icon(
+            Icons.close,
+            color: _secondaryText(isDark),
+          ),
+          onPressed: () {
+            setState(() {
+              _searchQuery = '';
+            });
+          },
+        )
+            : null,
+
         filled: true,
-        fillColor: Colors.white,
+        fillColor: _cardColor(isDark),
+
+        contentPadding:
+        const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 14,
+        ),
 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: Colors.grey.shade200,
+            color: _borderColor(isDark),
           ),
         ),
 
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: Colors.grey.shade200,
+            color: _borderColor(isDark),
           ),
         ),
 
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Colors.black,
+          borderSide: BorderSide(
+            color: _primaryColor(isDark),
+            width: 1.2,
           ),
         ),
       ),
 
       onChanged: (value) {
-        setState(() {});
+        setState(() {
+          _searchQuery =
+              value.trim().toLowerCase();
+        });
       },
     );
   }
@@ -300,26 +443,31 @@ class _AdminPharmacyManagementScreenState
   // FILTERS
   // ============================================================
 
-  Widget _buildFilters() {
+  Widget _buildFilters(bool isDark) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-
       child: Row(
         children: [
-          _filterButton('All'),
+          _filterButton('All', isDark),
           const SizedBox(width: 8),
-          _filterButton('Approved'),
+          _filterButton('Approved', isDark),
           const SizedBox(width: 8),
-          _filterButton('Pending'),
+          _filterButton('Pending', isDark),
           const SizedBox(width: 8),
-          _filterButton('Inactive'),
+          _filterButton('Rejected', isDark),
+          const SizedBox(width: 8),
+          _filterButton('Inactive', isDark),
         ],
       ),
     );
   }
 
-  Widget _filterButton(String filter) {
-    final selected = _selectedFilter == filter;
+  Widget _filterButton(
+      String filter,
+      bool isDark,
+      ) {
+    final selected =
+        _selectedFilter == filter;
 
     return GestureDetector(
       onTap: () {
@@ -327,35 +475,31 @@ class _AdminPharmacyManagementScreenState
           _selectedFilter = filter;
         });
       },
-
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 8,
         ),
-
         decoration: BoxDecoration(
           color: selected
-              ? Colors.black
-              : Colors.white,
-
-          borderRadius: BorderRadius.circular(20),
-
+              ? _primaryColor(isDark)
+              : _cardColor(isDark),
+          borderRadius:
+          BorderRadius.circular(20),
           border: Border.all(
             color: selected
-                ? Colors.black
-                : Colors.grey.shade300,
+                ? _primaryColor(isDark)
+                : _borderColor(isDark),
           ),
         ),
-
         child: Text(
           filter,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
             color: selected
                 ? Colors.white
-                : Colors.grey.shade700,
+                : _secondaryText(isDark),
           ),
         ),
       ),
@@ -368,6 +512,7 @@ class _AdminPharmacyManagementScreenState
 
   Widget _buildPharmacyCard(
       Map<String, dynamic> pharmacy,
+      bool isDark,
       ) {
     final bool active =
         pharmacy['active'] == true;
@@ -379,23 +524,37 @@ class _AdminPharmacyManagementScreenState
       onTap: () {
         _showPharmacyDetails(
           pharmacy,
+          isDark,
         );
       },
 
-      borderRadius: BorderRadius.circular(18),
+      borderRadius:
+      BorderRadius.circular(18),
 
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(15),
 
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _cardColor(isDark),
 
           borderRadius:
           BorderRadius.circular(18),
 
           border: Border.all(
-            color: Colors.grey.shade200,
+            color: _borderColor(isDark),
           ),
+
+          boxShadow: isDark
+              ? null
+              : [
+            BoxShadow(
+              color: Colors.black
+                  .withOpacity(0.025),
+              blurRadius: 8,
+              offset:
+              const Offset(0, 3),
+            ),
+          ],
         ),
 
         child: Column(
@@ -403,29 +562,35 @@ class _AdminPharmacyManagementScreenState
           CrossAxisAlignment.start,
 
           children: [
-
-            // ----------------------------------------------------
-            // NAME + STATUS
-            // ----------------------------------------------------
+            // ==================================================
+            // HEADER
+            // ==================================================
 
             Row(
               crossAxisAlignment:
               CrossAxisAlignment.start,
-
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
 
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                  decoration:
+                  BoxDecoration(
+                    color: _primaryColor(
+                      isDark,
+                    ).withOpacity(0.12),
                     borderRadius:
-                    BorderRadius.circular(13),
+                    BorderRadius.circular(
+                      13,
+                    ),
                   ),
 
                   child: Icon(
-                    Icons.local_pharmacy_outlined,
-                    color: Colors.grey.shade700,
+                    Icons
+                        .local_pharmacy_outlined,
+                    color:
+                    _primaryColor(isDark),
+                    size: 23,
                   ),
                 ),
 
@@ -435,76 +600,102 @@ class _AdminPharmacyManagementScreenState
                   child: Column(
                     crossAxisAlignment:
                     CrossAxisAlignment.start,
-
                     children: [
                       Text(
                         pharmacy['name'],
                         maxLines: 1,
                         overflow:
                         TextOverflow.ellipsis,
-
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight:
                           FontWeight.w700,
+                          color:
+                          _primaryText(
+                            isDark,
+                          ),
                         ),
                       ),
 
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
 
                       Text(
                         pharmacy['pharmacist'],
+                        maxLines: 1,
+                        overflow:
+                        TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color:
-                          Colors.grey.shade500,
+                          _secondaryText(
+                            isDark,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 2),
+
+                      Text(
+                        pharmacy['id'],
+                        style: TextStyle(
+                          fontSize: 9,
+                          color:
+                          _secondaryText(
+                            isDark,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                _statusBadge(status),
+                _statusBadge(
+                  status,
+                  isDark,
+                ),
               ],
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 15),
 
-            // ----------------------------------------------------
+            // ==================================================
             // DETAILS
-            // ----------------------------------------------------
+            // ==================================================
 
             _detailRow(
               Icons.phone_outlined,
               pharmacy['phone'],
+              isDark,
             ),
 
-            const SizedBox(height: 7),
+            const SizedBox(height: 8),
 
             _detailRow(
               Icons.location_on_outlined,
               pharmacy['address'],
+              isDark,
             ),
 
-            const SizedBox(height: 7),
+            const SizedBox(height: 8),
 
             _detailRow(
               Icons.badge_outlined,
               pharmacy['license'],
+              isDark,
             ),
 
             const SizedBox(height: 14),
 
             Divider(
               height: 1,
-              color: Colors.grey.shade200,
+              color: _borderColor(isDark),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // ----------------------------------------------------
-            // ACTIVE + ACTION
-            // ----------------------------------------------------
+            // ==================================================
+            // ACCOUNT STATUS + MANAGE
+            // ==================================================
 
             Row(
               children: [
@@ -514,11 +705,13 @@ class _AdminPharmacyManagementScreenState
                       Container(
                         width: 7,
                         height: 7,
-
-                        decoration: BoxDecoration(
+                        decoration:
+                        BoxDecoration(
                           color: active
-                              ? Colors.green.shade600
-                              : Colors.grey.shade400,
+                              ? const Color(
+                            0xFF32C787,
+                          )
+                              : Colors.grey,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -527,16 +720,19 @@ class _AdminPharmacyManagementScreenState
 
                       Text(
                         active
-                            ? 'Active'
-                            : 'Inactive',
-
+                            ? 'Account Active'
+                            : 'Account Inactive',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight:
                           FontWeight.w600,
                           color: active
-                              ? Colors.green.shade700
-                              : Colors.grey.shade600,
+                              ? _primaryColor(
+                            isDark,
+                          )
+                              : _secondaryText(
+                            isDark,
+                          ),
                         ),
                       ),
                     ],
@@ -547,15 +743,20 @@ class _AdminPharmacyManagementScreenState
                   onPressed: () {
                     _showPharmacyActions(
                       pharmacy,
+                      isDark,
                     );
                   },
 
-                  child: const Text(
+                  child: Text(
                     'Manage',
                     style: TextStyle(
-                      color: Colors.black,
+                      color:
+                      _primaryColor(
+                        isDark,
+                      ),
                       fontWeight:
-                      FontWeight.w600,
+                      FontWeight.w700,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -574,13 +775,14 @@ class _AdminPharmacyManagementScreenState
   Widget _detailRow(
       IconData icon,
       String value,
+      bool isDark,
       ) {
     return Row(
       children: [
         Icon(
           icon,
           size: 15,
-          color: Colors.grey.shade500,
+          color: _secondaryText(isDark),
         ),
 
         const SizedBox(width: 7),
@@ -591,10 +793,10 @@ class _AdminPharmacyManagementScreenState
             maxLines: 1,
             overflow:
             TextOverflow.ellipsis,
-
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey.shade600,
+              color:
+              _secondaryText(isDark),
             ),
           ),
         ),
@@ -606,36 +808,61 @@ class _AdminPharmacyManagementScreenState
   // STATUS BADGE
   // ============================================================
 
-  Widget _statusBadge(String status) {
-    final bool approved =
-        status == 'Approved';
+  Widget _statusBadge(
+      String status,
+      bool isDark,
+      ) {
+    late Color background;
+    late Color text;
+
+    switch (status) {
+      case 'Approved':
+        background =
+            const Color(0xFF32C787)
+                .withOpacity(0.12);
+        text = _primaryColor(isDark);
+        break;
+
+      case 'Pending':
+        background =
+            const Color(0xFFFFB74D)
+                .withOpacity(0.13);
+        text = const Color(0xFFE68A00);
+        break;
+
+      case 'Rejected':
+        background =
+            const Color(0xFFE53935)
+                .withOpacity(0.10);
+        text = const Color(0xFFD32F2F);
+        break;
+
+      default:
+        background =
+            Colors.grey.withOpacity(0.1);
+        text = Colors.grey;
+    }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         horizontal: 9,
         vertical: 5,
       ),
 
       decoration: BoxDecoration(
-        color: approved
-            ? Colors.green.shade50
-            : Colors.orange.shade50,
-
+        color: background,
         borderRadius:
         BorderRadius.circular(20),
       ),
 
       child: Text(
         status,
-
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 9,
           fontWeight:
-          FontWeight.w600,
-
-          color: approved
-              ? Colors.green.shade700
-              : Colors.orange.shade700,
+          FontWeight.w700,
+          color: text,
         ),
       ),
     );
@@ -645,75 +872,121 @@ class _AdminPharmacyManagementScreenState
   // FILTER DATA
   // ============================================================
 
-  List<Map<String, dynamic>> _filteredPharmacies() {
-    if (_selectedFilter == 'All') {
-      return _pharmacies;
-    }
+  List<Map<String, dynamic>>
+  _filteredPharmacies() {
+    Iterable<Map<String, dynamic>>
+    result = _pharmacies;
 
+    // Status filter
     if (_selectedFilter == 'Inactive') {
-      return _pharmacies
-          .where(
+      result = result.where(
             (pharmacy) =>
         pharmacy['active'] == false,
-      )
-          .toList();
+      );
+    } else if (_selectedFilter != 'All') {
+      result = result.where(
+            (pharmacy) =>
+        pharmacy['status'] ==
+            _selectedFilter,
+      );
     }
 
-    return _pharmacies
-        .where(
-          (pharmacy) =>
-      pharmacy['status'] ==
-          _selectedFilter,
-    )
-        .toList();
+    // Search filter
+    if (_searchQuery.isNotEmpty) {
+      result = result.where(
+            (pharmacy) {
+          final name =
+          pharmacy['name']
+              .toString()
+              .toLowerCase();
+
+          final pharmacist =
+          pharmacy['pharmacist']
+              .toString()
+              .toLowerCase();
+
+          final license =
+          pharmacy['license']
+              .toString()
+              .toLowerCase();
+
+          final address =
+          pharmacy['address']
+              .toString()
+              .toLowerCase();
+
+          return name.contains(
+            _searchQuery,
+          ) ||
+              pharmacist.contains(
+                _searchQuery,
+              ) ||
+              license.contains(
+                _searchQuery,
+              ) ||
+              address.contains(
+                _searchQuery,
+              );
+        },
+      );
+    }
+
+    return result.toList();
   }
 
   // ============================================================
   // EMPTY STATE
   // ============================================================
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(
+      bool isDark,
+      ) {
     return Container(
-      padding: const EdgeInsets.all(30),
+      padding:
+      const EdgeInsets.all(30),
 
       decoration: BoxDecoration(
-        color: Colors.white,
-
+        color: _cardColor(isDark),
         borderRadius:
         BorderRadius.circular(18),
-
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: _borderColor(isDark),
         ),
       ),
 
       child: Column(
         children: [
           Icon(
-            Icons.local_pharmacy_outlined,
+            Icons
+                .local_pharmacy_outlined,
             size: 42,
-            color: Colors.grey.shade400,
+            color:
+            _secondaryText(isDark),
           ),
 
           const SizedBox(height: 12),
 
-          const Text(
+          Text(
             'No pharmacies found',
             style: TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontWeight:
+              FontWeight.w700,
+              color:
+              _primaryText(isDark),
             ),
           ),
 
           const SizedBox(height: 5),
 
           Text(
-            'There are no pharmacies matching this filter.',
-            textAlign: TextAlign.center,
-
+            'There are no pharmacies matching your search or filter.',
+            textAlign:
+            TextAlign.center,
             style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade500,
+              fontSize: 11,
+              color:
+              _secondaryText(isDark),
             ),
           ),
         ],
@@ -727,16 +1000,20 @@ class _AdminPharmacyManagementScreenState
 
   void _showPharmacyDetails(
       Map<String, dynamic> pharmacy,
+      bool isDark,
       ) {
     showModalBottomSheet(
       context: context,
 
-      backgroundColor: Colors.white,
+      backgroundColor:
+      _cardColor(isDark),
 
       isScrollControlled: true,
 
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
+      shape:
+      const RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.vertical(
           top: Radius.circular(25),
         ),
       ),
@@ -744,14 +1021,16 @@ class _AdminPharmacyManagementScreenState
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              30,
+            padding:
+            const EdgeInsets.fromLTRB(
+              22,
+              20,
+              22,
+              28,
             ),
 
-            child: SingleChildScrollView(
+            child:
+            SingleChildScrollView(
               child: Column(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
@@ -761,11 +1040,18 @@ class _AdminPharmacyManagementScreenState
                     child: Container(
                       width: 40,
                       height: 4,
-
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
+                      decoration:
+                      BoxDecoration(
+                        color:
+                        _secondaryText(
+                          isDark,
+                        ).withOpacity(
+                          0.25,
+                        ),
                         borderRadius:
-                        BorderRadius.circular(10),
+                        BorderRadius.circular(
+                          10,
+                        ),
                       ),
                     ),
                   ),
@@ -775,19 +1061,28 @@ class _AdminPharmacyManagementScreenState
                   Row(
                     children: [
                       Container(
-                        width: 50,
-                        height: 50,
-
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius:
-                          BorderRadius.circular(14),
-                        ),
-
-                        child: Icon(
-                          Icons.local_pharmacy_outlined,
+                        width: 52,
+                        height: 52,
+                        decoration:
+                        BoxDecoration(
                           color:
-                          Colors.grey.shade700,
+                          _primaryColor(
+                            isDark,
+                          ).withOpacity(
+                            0.12,
+                          ),
+                          borderRadius:
+                          BorderRadius.circular(
+                            14,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons
+                              .local_pharmacy_outlined,
+                          color:
+                          _primaryColor(
+                            isDark,
+                          ),
                         ),
                       ),
 
@@ -796,26 +1091,35 @@ class _AdminPharmacyManagementScreenState
                       Expanded(
                         child: Column(
                           crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                          CrossAxisAlignment
+                              .start,
                           children: [
                             Text(
                               pharmacy['name'],
-                              style:
-                              const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight:
                                 FontWeight.w700,
+                                color:
+                                _primaryText(
+                                  isDark,
+                                ),
                               ),
                             ),
 
-                            const SizedBox(height: 3),
+                            const SizedBox(
+                              height: 3,
+                            ),
 
                             Text(
-                              pharmacy['pharmacist'],
+                              pharmacy[
+                              'pharmacist'],
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 color:
-                                Colors.grey.shade500,
+                                _secondaryText(
+                                  isDark,
+                                ),
                               ),
                             ),
                           ],
@@ -827,65 +1131,96 @@ class _AdminPharmacyManagementScreenState
                   const SizedBox(height: 22),
 
                   _bottomDetail(
+                    'Pharmacy ID',
+                    pharmacy['id'],
+                    isDark,
+                  ),
+
+                  _bottomDetail(
+                    'Pharmacist',
+                    pharmacy['pharmacist'],
+                    isDark,
+                  ),
+
+                  _bottomDetail(
                     'Phone',
                     pharmacy['phone'],
+                    isDark,
                   ),
 
                   _bottomDetail(
                     'Email',
                     pharmacy['email'],
+                    isDark,
                   ),
 
                   _bottomDetail(
                     'Address',
                     pharmacy['address'],
+                    isDark,
                   ),
 
                   _bottomDetail(
                     'License Number',
                     pharmacy['license'],
+                    isDark,
                   ),
 
                   _bottomDetail(
-                    'Status',
+                    'Approval Status',
                     pharmacy['status'],
+                    isDark,
                   ),
 
                   _bottomDetail(
-                    'Account',
+                    'Account Status',
                     pharmacy['active']
                         ? 'Active'
                         : 'Inactive',
+                    isDark,
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
 
                   SizedBox(
-                    width: double.infinity,
+                    width:
+                    double.infinity,
                     height: 48,
-
-                    child: ElevatedButton(
+                    child:
+                    ElevatedButton(
                       onPressed: () {
-                        Navigator.pop(ctx);
+                        Navigator.pop(
+                          ctx,
+                        );
 
                         _showPharmacyActions(
                           pharmacy,
+                          isDark,
                         );
                       },
 
                       style:
-                      ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-
+                      ElevatedButton
+                          .styleFrom(
+                        backgroundColor:
+                        _primaryColor(
+                          isDark,
+                        ),
+                        foregroundColor:
+                        Colors.white,
+                        elevation: 0,
                         shape:
                         RoundedRectangleBorder(
                           borderRadius:
-                          BorderRadius.circular(13),
+                          BorderRadius
+                              .circular(
+                            13,
+                          ),
                         ),
                       ),
 
-                      child: const Text(
+                      child:
+                      const Text(
                         'Manage Pharmacy',
                         style: TextStyle(
                           fontWeight:
@@ -910,10 +1245,12 @@ class _AdminPharmacyManagementScreenState
   Widget _bottomDetail(
       String title,
       String value,
+      bool isDark,
       ) {
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 15,
+      padding:
+      const EdgeInsets.only(
+        bottom: 14,
       ),
 
       child: Column(
@@ -924,8 +1261,9 @@ class _AdminPharmacyManagementScreenState
           Text(
             title,
             style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade500,
+              fontSize: 10,
+              color:
+              _secondaryText(isDark),
             ),
           ),
 
@@ -933,9 +1271,12 @@ class _AdminPharmacyManagementScreenState
 
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight:
+              FontWeight.w600,
+              color:
+              _primaryText(isDark),
             ),
           ),
         ],
@@ -949,14 +1290,18 @@ class _AdminPharmacyManagementScreenState
 
   void _showPharmacyActions(
       Map<String, dynamic> pharmacy,
+      bool isDark,
       ) {
     showModalBottomSheet(
       context: context,
 
-      backgroundColor: Colors.white,
+      backgroundColor:
+      _cardColor(isDark),
 
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
+      shape:
+      const RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.vertical(
           top: Radius.circular(25),
         ),
       ),
@@ -966,63 +1311,96 @@ class _AdminPharmacyManagementScreenState
             pharmacy['active'] == true;
 
         final bool pending =
-            pharmacy['status'] == 'Pending';
+            pharmacy['status'] ==
+                'Pending';
+
+        final bool rejected =
+            pharmacy['status'] ==
+                'Rejected';
 
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
+            padding:
+            const EdgeInsets.fromLTRB(
+              22,
+              20,
+              22,
               24,
             ),
 
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize:
+              MainAxisSize.min,
 
               children: [
                 Center(
                   child: Container(
                     width: 40,
                     height: 4,
-
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                    decoration:
+                    BoxDecoration(
+                      color:
+                      _secondaryText(
+                        isDark,
+                      ).withOpacity(
+                        0.25,
+                      ),
                       borderRadius:
-                      BorderRadius.circular(10),
+                      BorderRadius.circular(
+                        10,
+                      ),
                     ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Text(
-                  pharmacy['name'],
-                  textAlign: TextAlign.center,
-
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
 
                 const SizedBox(height: 18),
 
-                if (pending)
+                Text(
+                  pharmacy['name'],
+                  textAlign:
+                  TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight:
+                    FontWeight.w700,
+                    color:
+                    _primaryText(
+                      isDark,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // =================================================
+                // APPROVE
+                // =================================================
+
+                if (pending || rejected)
                   _actionTile(
-                    icon: Icons.check_circle_outline,
-                    title: 'Approve Pharmacy',
+                    isDark: isDark,
+                    icon: Icons
+                        .check_circle_outline,
+                    title:
+                    pending
+                        ? 'Approve Pharmacy'
+                        : 'Re-approve Pharmacy',
                     subtitle:
                     'Approve this pharmacy account',
                     iconColor:
-                    Colors.green.shade600,
+                    _primaryColor(
+                      isDark,
+                    ),
                     onTap: () {
-                      Navigator.pop(ctx);
+                      Navigator.pop(
+                        ctx,
+                      );
 
                       setState(() {
                         pharmacy['status'] =
                         'Approved';
-                        pharmacy['active'] = true;
+                        pharmacy['active'] =
+                        true;
                       });
 
                       _showMessage(
@@ -1031,48 +1409,102 @@ class _AdminPharmacyManagementScreenState
                     },
                   ),
 
+                // =================================================
+                // REJECT
+                // =================================================
+
+                if (pending)
+                  _actionTile(
+                    isDark: isDark,
+                    icon: Icons
+                        .cancel_outlined,
+                    title:
+                    'Reject Pharmacy',
+                    subtitle:
+                    'Reject this pharmacy application',
+                    iconColor:
+                    Colors.red.shade600,
+                    onTap: () {
+                      Navigator.pop(
+                        ctx,
+                      );
+
+                      _showRejectConfirmation(
+                        pharmacy,
+                        isDark,
+                      );
+                    },
+                  ),
+
+                // =================================================
+                // ACTIVATE / DEACTIVATE
+                // =================================================
+
+                if (!pending &&
+                    !rejected)
+                  _actionTile(
+                    isDark: isDark,
+                    icon: active
+                        ? Icons
+                        .block_outlined
+                        : Icons
+                        .check_circle_outline,
+                    title: active
+                        ? 'Deactivate Pharmacy'
+                        : 'Activate Pharmacy',
+                    subtitle: active
+                        ? 'Disable this pharmacy account'
+                        : 'Enable this pharmacy account',
+                    iconColor: active
+                        ? Colors.red.shade600
+                        : _primaryColor(
+                      isDark,
+                    ),
+                    onTap: () {
+                      Navigator.pop(
+                        ctx,
+                      );
+
+                      if (active) {
+                        _showDeactivateConfirmation(
+                          pharmacy,
+                          isDark,
+                        );
+                      } else {
+                        setState(() {
+                          pharmacy[
+                          'active'] =
+                          true;
+                        });
+
+                        _showMessage(
+                          'Pharmacy activated.',
+                        );
+                      }
+                    },
+                  ),
+
+                // =================================================
+                // EDIT
+                // =================================================
+
                 _actionTile(
-                  icon: active
-                      ? Icons.block_outlined
-                      : Icons.check_circle_outline,
-                  title: active
-                      ? 'Deactivate Pharmacy'
-                      : 'Activate Pharmacy',
-                  subtitle: active
-                      ? 'Disable this pharmacy account'
-                      : 'Enable this pharmacy account',
-                  iconColor: active
-                      ? Colors.red.shade600
-                      : Colors.green.shade600,
-                  onTap: () {
-                    Navigator.pop(ctx);
-
-                    setState(() {
-                      pharmacy['active'] =
-                      !active;
-                    });
-
-                    _showMessage(
-                      active
-                          ? 'Pharmacy deactivated.'
-                          : 'Pharmacy activated.',
-                    );
-                  },
-                ),
-
-                _actionTile(
-                  icon: Icons.edit_outlined,
-                  title: 'Edit Pharmacy',
+                  isDark: isDark,
+                  icon:
+                  Icons.edit_outlined,
+                  title:
+                  'Edit Pharmacy',
                   subtitle:
                   'Update pharmacy information',
                   iconColor:
-                  Colors.grey.shade700,
+                  _secondaryText(
+                    isDark,
+                  ),
                   onTap: () {
-                    Navigator.pop(ctx);
-
-                    _showMessage(
-                      'Edit pharmacy will be connected next.',
+                    Navigator.pop(
+                      ctx,
                     );
+                    _showEditPharmacySheet(pharmacy);
                   },
                 ),
               ],
@@ -1088,6 +1520,7 @@ class _AdminPharmacyManagementScreenState
   // ============================================================
 
   Widget _actionTile({
+    required bool isDark,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -1095,20 +1528,21 @@ class _AdminPharmacyManagementScreenState
     required VoidCallback onTap,
   }) {
     return ListTile(
-      contentPadding: EdgeInsets.zero,
+      contentPadding:
+      EdgeInsets.zero,
 
       leading: Container(
         width: 42,
         height: 42,
-
-        decoration: BoxDecoration(
-          color: iconColor.withValues(
-            alpha: 0.08,
-          ),
+        decoration:
+        BoxDecoration(
+          color: iconColor
+              .withOpacity(0.09),
           borderRadius:
-          BorderRadius.circular(12),
+          BorderRadius.circular(
+            12,
+          ),
         ),
-
         child: Icon(
           icon,
           color: iconColor,
@@ -1118,17 +1552,21 @@ class _AdminPharmacyManagementScreenState
 
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight:
+          FontWeight.w600,
+          color:
+          _primaryText(isDark),
         ),
       ),
 
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          fontSize: 11,
-          color: Colors.grey.shade500,
+          fontSize: 10,
+          color:
+          _secondaryText(isDark),
         ),
       ),
 
@@ -1137,14 +1575,323 @@ class _AdminPharmacyManagementScreenState
   }
 
   // ============================================================
+  // DEACTIVATE CONFIRMATION
+  // ============================================================
+
+  void _showDeactivateConfirmation(
+      Map<String, dynamic> pharmacy,
+      bool isDark,
+      ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor:
+          _cardColor(isDark),
+
+          title: Text(
+            'Deactivate Pharmacy',
+            style: TextStyle(
+              fontWeight:
+              FontWeight.w700,
+              color:
+              _primaryText(isDark),
+            ),
+          ),
+
+          content: Text(
+            'Are you sure you want to deactivate ${pharmacy['name']}?',
+            style: TextStyle(
+              color:
+              _secondaryText(isDark),
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color:
+                  _primaryText(
+                    isDark,
+                  ),
+                ),
+              ),
+            ),
+
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  pharmacy['active'] =
+                  false;
+                });
+
+                Navigator.pop(ctx);
+
+                _showMessage(
+                  'Pharmacy deactivated.',
+                );
+              },
+              child: Text(
+                'Deactivate',
+                style: TextStyle(
+                  color:
+                  Colors.red.shade600,
+                  fontWeight:
+                  FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // REJECT CONFIRMATION
+  // ============================================================
+
+  void _showRejectConfirmation(
+      Map<String, dynamic> pharmacy,
+      bool isDark,
+      ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor:
+          _cardColor(isDark),
+
+          title: Text(
+            'Reject Pharmacy',
+            style: TextStyle(
+              fontWeight:
+              FontWeight.w700,
+              color:
+              _primaryText(isDark),
+            ),
+          ),
+
+          content: Text(
+            'Are you sure you want to reject ${pharmacy['name']}?',
+            style: TextStyle(
+              color:
+              _secondaryText(isDark),
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color:
+                  _primaryText(
+                    isDark,
+                  ),
+                ),
+              ),
+            ),
+
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  pharmacy['status'] =
+                  'Rejected';
+                  pharmacy['active'] =
+                  false;
+                });
+
+                Navigator.pop(ctx);
+
+                _showMessage(
+                  'Pharmacy rejected.',
+                );
+              },
+              child: Text(
+                'Reject',
+                style: TextStyle(
+                  color:
+                  Colors.red.shade600,
+                  fontWeight:
+                  FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ============================================================
   // MESSAGE
   // ============================================================
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _showMessage(
+      String message,
+      ) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
-        content: Text(message),
+        behavior:
+        SnackBarBehavior.floating,
+        content:
+        Text(message),
       ),
+    );
+  }
+
+  // ============================================================
+  // EDIT PHARMACY SHEET
+  // ============================================================
+
+  Widget _inputField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 19),
+        filled: true,
+        fillColor: isDark
+            ? const Color(0xFF111D17)
+            : const Color(0xFFF5F7F6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF0F7253)),
+        ),
+      ),
+    );
+  }
+
+  void _showEditPharmacySheet(Map<String, dynamic> pharmacy) {
+    final nameCtrl = TextEditingController(text: pharmacy['name']);
+    final pharmacistCtrl = TextEditingController(text: pharmacy['pharmacist']);
+    final phoneCtrl = TextEditingController(text: pharmacy['phone']);
+    final emailCtrl = TextEditingController(text: pharmacy['email']);
+    final addressCtrl = TextEditingController(text: pharmacy['address']);
+    final licenseCtrl = TextEditingController(text: pharmacy['license']);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _cardColor(Theme.of(context).brightness == Brightness.dark),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 15, 20, MediaQuery.of(ctx).viewInsets.bottom + 25),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Edit Pharmacy',
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                      color: _primaryText(isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _inputField(controller: nameCtrl, label: 'Pharmacy Name', hint: 'Enter pharmacy name', icon: Icons.store_outlined),
+                  const SizedBox(height: 11),
+                  _inputField(controller: pharmacistCtrl, label: 'Pharmacist', hint: 'Enter pharmacist name', icon: Icons.person_outline),
+                  const SizedBox(height: 11),
+                  _inputField(controller: phoneCtrl, label: 'Phone', hint: 'Enter phone number', icon: Icons.phone_outlined, keyboardType: TextInputType.phone),
+                  const SizedBox(height: 11),
+                  _inputField(controller: emailCtrl, label: 'Email', hint: 'Enter email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+                  const SizedBox(height: 11),
+                  _inputField(controller: addressCtrl, label: 'Address', hint: 'Enter address', icon: Icons.location_on_outlined),
+                  const SizedBox(height: 11),
+                  _inputField(controller: licenseCtrl, label: 'License', hint: 'Enter license number', icon: Icons.badge_outlined),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        final name = nameCtrl.text.trim();
+                        final pharmacist = pharmacistCtrl.text.trim();
+                        final phone = phoneCtrl.text.trim();
+                        final email = emailCtrl.text.trim();
+                        final address = addressCtrl.text.trim();
+                        final license = licenseCtrl.text.trim();
+
+                        if (name.isEmpty || pharmacist.isEmpty || phone.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Name, pharmacist, and phone are required.')),
+                          );
+                          return;
+                        }
+
+                        setState(() {
+                          pharmacy['name'] = name;
+                          pharmacy['pharmacist'] = pharmacist;
+                          pharmacy['phone'] = phone;
+                          pharmacy['email'] = email;
+                          pharmacy['address'] = address;
+                          pharmacy['license'] = license;
+                        });
+
+                        Navigator.pop(ctx);
+                        _showMessage('$name updated successfully.');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor(isDark),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                      ),
+                      icon: const Icon(Icons.save_outlined, size: 19),
+                      label: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
