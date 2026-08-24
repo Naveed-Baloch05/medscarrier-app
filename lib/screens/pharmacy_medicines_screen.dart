@@ -187,10 +187,10 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
-            color: isSelected ? cs.primary : (isDark ? const Color(0xFF131D19) : Colors.white),
+            color: isSelected ? const Color(0xFF0F7253) : (isDark ? const Color(0xFF131D19) : Colors.white),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? cs.primary : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
+              color: isSelected ? const Color(0xFF0F7253) : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
             ),
           ),
           child: Center(
@@ -386,7 +386,7 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                             prefixIcon: const Icon(Icons.category_outlined),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: const Color(0xFF0F7253))),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                           items: const [
@@ -414,7 +414,7 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                             });
                           },
                           contentPadding: EdgeInsets.zero,
-                          activeThumbColor: cs.primary,
+                          activeThumbColor: const Color(0xFF0F7253),
                         ),
                         const SizedBox(height: 20),
 
@@ -463,10 +463,10 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                               } else {
                                 message = 'Medicine updated.';
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: cs.primary));
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: const Color(0xFF0F7253)));
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: cs.primary,
+                              backgroundColor: const Color(0xFF0F7253),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                             ),
@@ -512,7 +512,7 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
         errorStyle: const TextStyle(fontSize: 12),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: const Color(0xFF0F7253))),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );

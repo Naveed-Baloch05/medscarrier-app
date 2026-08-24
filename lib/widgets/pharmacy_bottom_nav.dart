@@ -18,7 +18,7 @@ class PharmacyBottomNav extends StatelessWidget {
       currentIndex: currentIndex,
       onTap: onTap,
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: cs.primary,
+      selectedItemColor: const Color(0xFF0F7253),
       unselectedItemColor: cs.onSurfaceVariant,
       backgroundColor: Theme.of(context).cardColor,
       elevation: 8,

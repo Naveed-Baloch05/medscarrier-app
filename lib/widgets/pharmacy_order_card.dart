@@ -41,7 +41,7 @@ class PharmacyOrderCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: cs.primary,
+                    color: const Color(0xFF0F7253),
                   ),
                 ),
                 const Spacer(),
@@ -118,14 +118,14 @@ class PharmacyOrderCard extends StatelessWidget {
                   Icon(
                     Icons.delivery_dining_rounded,
                     size: 16,
-                    color: cs.primary,
+                    color: const Color(0xFF0F7253),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Rider: ${order.riderName}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: cs.primary,
+                      color: const Color(0xFF0F7253),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

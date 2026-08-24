@@ -41,12 +41,12 @@ class PharmacyOrderFilter extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? cs.primary
+                    ? const Color(0xFF0F7253)
                     : (isDark ? const Color(0xFF131D19) : Colors.white),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isSelected
-                      ? cs.primary
+                      ? const Color(0xFF0F7253)
                       : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
                 ),
               ),

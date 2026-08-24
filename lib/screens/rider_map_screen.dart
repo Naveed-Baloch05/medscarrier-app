@@ -371,7 +371,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 });
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C4DFF),
+                backgroundColor: const Color(0xFF0F7253),
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

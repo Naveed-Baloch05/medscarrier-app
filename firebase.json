@@ -1,1 +1,24 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"medscarrier","appId":"1:393598831148:android:33f11ff3edcf92a82f9f89","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"medscarrier","configurations":{"android":"1:393598831148:android:33f11ff3edcf92a82f9f89"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "medscarrier",
+          "appId": "1:393598831148:android:33f11ff3edcf92a82f9f89",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "medscarrier",
+          "configurations": {
+            "android": "1:393598831148:android:33f11ff3edcf92a82f9f89"
+          }
+        }
+      }
+    }
+  }
+}

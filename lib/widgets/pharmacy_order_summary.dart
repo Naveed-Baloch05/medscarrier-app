@@ -25,7 +25,6 @@ class PharmacyOrderSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     return Column(
@@ -43,7 +42,7 @@ class PharmacyOrderSummary extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF32C787),
+                  color: Color(0xFF0F7253),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -52,15 +51,15 @@ class PharmacyOrderSummary extends StatelessWidget {
                 'Accepting orders',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : cs.primary,
+                  color: isDark ? Colors.white : const Color(0xFF0F7253),
                 ),
               ),
               const Spacer(),
               Switch(
                 value: isAcceptingOrders,
-                activeThumbColor: isDark ? Colors.white : cs.primary,
+                activeThumbColor: isDark ? Colors.white : const Color(0xFF0F7253),
                 activeTrackColor:
-                    isDark ? const Color(0xFF32C787) : const Color(0xFFA5D6A7),
+                    isDark ? const Color(0xFF0F7253) : const Color(0xFFA5D6A7),
                 onChanged: onToggleAccepting,
               ),
             ],
@@ -138,7 +137,7 @@ class PharmacyOrderSummary extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: isSelected
                 ? Border.all(
-                    color: isDark ? const Color(0xFF32C787) : Colors.transparent,
+                    color: isDark ? const Color(0xFF0F7253) : Colors.transparent,
                     width: 1,
                   )
                 : null,

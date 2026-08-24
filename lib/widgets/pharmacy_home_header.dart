@@ -24,12 +24,12 @@ class PharmacyHomeHeader extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1D322A) : cs.primary,
+            color: isDark ? const Color(0xFF1D322A) : const Color(0xFF0F7253),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             Icons.local_pharmacy_rounded,
-            color: isDark ? cs.primary : Colors.white,
+            color: isDark ? const Color(0xFF0F7253) : Colors.white,
             size: 24,
           ),
         ),

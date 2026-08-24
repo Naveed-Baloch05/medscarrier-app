@@ -37,7 +37,7 @@ class _PharmacyNotificationsScreenState extends State<PharmacyNotificationsScree
             },
             child: Text(
               'Mark all read',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.primary),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F7253)),
             ),
           ),
         ],
@@ -208,7 +208,7 @@ class _NotificationTile extends StatelessWidget {
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: const Color(0xFF0F7253), shape: BoxShape.circle),
                       ),
                   ],
                 ),

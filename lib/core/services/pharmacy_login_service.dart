@@ -1,40 +1,73 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../models/pharmacy_model.dart';
 
 class PharmacyLoginService {
   PharmacyLoginService._();
   static final PharmacyLoginService instance = PharmacyLoginService._();
 
-  final List<PharmacyModel> _pharmacies = [
-    const PharmacyModel(
-      id: 'pharmacy_demo',
-      pharmacyName: 'Boots Pharmacy',
-      contactName: 'Sarah Manager',
-      email: 'pharmacy@test.com',
-      phone: '02071234567',
-      businessAddress: '123 High Street, London',
-      gphcNumber: '1234567',
-    ),
-  ];
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<PharmacyModel> login({
     required String email,
     required String password,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    final credential = await _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
 
-    final pharmacy = _pharmacies.cast<PharmacyModel?>().firstWhere(
-          (p) => p!.email.toLowerCase() == email.toLowerCase(),
-          orElse: () => null,
-        );
-
-    if (pharmacy == null) {
-      throw Exception('No account found for this email.');
+    final firebaseUser = credential.user;
+    if (firebaseUser == null) {
+      throw Exception('Login failed. Please try again.');
     }
 
-    if (password.length < 4) {
-      throw Exception('Incorrect password.');
+    final uid = firebaseUser.uid;
+
+    final doc = await _firestore.collection('pharmacies').doc(uid).get();
+
+    if (!doc.exists || doc.data() == null) {
+      final appSnapshot = await _firestore
+          .collection('pharmacy_applications')
+          .where('email', isEqualTo: email.trim().toLowerCase())
+          .limit(1)
+          .get();
+
+      if (appSnapshot.docs.isNotEmpty) {
+        final appData = appSnapshot.docs.first.data();
+        final status = appData['status'] as String? ?? '';
+
+        await _auth.signOut();
+
+        if (status == 'pending') {
+          throw Exception(
+            'Your pharmacy application is still waiting for admin approval.',
+          );
+        } else if (status == 'rejected') {
+          throw Exception(
+            'Your pharmacy application was rejected.',
+          );
+        }
+      }
+
+      await _auth.signOut();
+      throw Exception(
+        'Your account has not been created yet. Please wait for admin approval.',
+      );
     }
 
-    return pharmacy;
+    final data = doc.data()!;
+    final active = data['active'] as bool? ?? false;
+
+    if (!active) {
+      await _auth.signOut();
+      throw Exception(
+        'Your pharmacy account is not active. Please contact support.',
+      );
+    }
+
+    return PharmacyModel.fromJson({'id': doc.id, ...data});
   }
 }

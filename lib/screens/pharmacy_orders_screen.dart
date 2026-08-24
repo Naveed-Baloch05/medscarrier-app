@@ -66,7 +66,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showOrderForm(context),
-        backgroundColor: cs.primary,
+        backgroundColor: const Color(0xFF0F7253),
         foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.add_rounded, size: 28),
@@ -337,11 +337,11 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                                 content: Text(isEditing ? 'Order updated.' : 'Order added.'),
-                                backgroundColor: cs.primary,
+                                backgroundColor: const Color(0xFF0F7253),
                               ));
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: cs.primary,
+                              backgroundColor: const Color(0xFF0F7253),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                             ),
@@ -439,7 +439,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                 Container(
                                   width: 6,
                                   height: 6,
-                                  decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+                                  decoration: BoxDecoration(color: const Color(0xFF0F7253), shape: BoxShape.circle),
                                 ),
                                 const SizedBox(width: 10),
                                 Text(item, style: TextStyle(fontSize: 13, color: cs.onSurface)),
@@ -494,14 +494,14 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                 Navigator.pop(ctx);
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                                   content: Text('Order marked as $nextStatus.'),
-                                  backgroundColor: cs.primary,
+                                  backgroundColor: const Color(0xFF0F7253),
                                 ));
                               }
                             },
                             icon: Icon(_statusActionIcon(nextStatus), size: 20),
                             label: Text(_statusActionLabel(nextStatus), style: const TextStyle(fontWeight: FontWeight.w700)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: cs.primary,
+                              backgroundColor: const Color(0xFF0F7253),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
@@ -656,7 +656,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                 : (isDark ? const Color(0xFF131D19) : Colors.grey.shade50),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: isSelected ? cs.primary : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
+                              color: isSelected ? const Color(0xFF0F7253) : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
                               width: isSelected ? 2 : 1,
                             ),
                           ),
@@ -674,7 +674,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                 child: Icon(
                                   Icons.delivery_dining_rounded,
                                   size: 22,
-                                  color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                                  color: isSelected ? const Color(0xFF0F7253) : cs.onSurfaceVariant,
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -697,7 +697,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                   ],
                                 ),
                               ),
-                              if (isSelected) Icon(Icons.check_circle, color: cs.primary),
+                              if (isSelected) Icon(Icons.check_circle, color: const Color(0xFF0F7253)),
                             ],
                           ),
                         ),
@@ -720,11 +720,11 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text('Order marked as Ready. Assigned to ${rider['name']}.'),
-                            backgroundColor: cs.primary,
+                            backgroundColor: const Color(0xFF0F7253),
                           ));
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.primary,
+                          backgroundColor: const Color(0xFF0F7253),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
@@ -776,7 +776,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: cs.primary),
+          borderSide: BorderSide(color: const Color(0xFF0F7253)),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),

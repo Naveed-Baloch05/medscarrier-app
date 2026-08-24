@@ -116,7 +116,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: cs.primary,
+                      color: const Color(0xFF0F7253),
                       shape: BoxShape.circle,
                       border: Border.all(color: Theme.of(context).cardColor, width: 2),
                     ),
@@ -211,7 +211,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
           style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
         value: pharmacyOpen,
-        activeThumbColor: cs.primary,
+        activeThumbColor: const Color(0xFF0F7253),
         onChanged: (value) => setState(() => pharmacyOpen = value),
       ),
     ]);
@@ -237,7 +237,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
           style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
         value: notificationsEnabled,
-        activeThumbColor: cs.primary,
+        activeThumbColor: const Color(0xFF0F7253),
         onChanged: (value) => setState(() => notificationsEnabled = value),
       ),
       _divider(isDark),
@@ -256,7 +256,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
             value: isDarkMode,
-            activeThumbColor: cs.primary,
+            activeThumbColor: const Color(0xFF0F7253),
             onChanged: (_) => context.read<ThemeBloc>().add(ThemeToggled()),
           );
         },
@@ -397,7 +397,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
+                        backgroundColor: const Color(0xFF0F7253),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
@@ -433,7 +433,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
         prefixIcon: Icon(icon, color: cs.onSurfaceVariant),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: const Color(0xFF0F7253))),
       ),
     );
   }
@@ -479,7 +479,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated.')));
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.primary,
+                      backgroundColor: const Color(0xFF0F7253),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -513,7 +513,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
         prefixIcon: Icon(Icons.lock_outline, color: cs.onSurfaceVariant),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: const Color(0xFF0F7253))),
       ),
     );
   }

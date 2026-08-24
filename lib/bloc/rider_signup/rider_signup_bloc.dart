@@ -21,16 +21,19 @@ class RiderSignupBloc extends Bloc<RiderSignupEvent, RiderSignupState> {
     emit(const RiderSignupLoading());
 
     try {
-      final rider = await _service.register(
+      final application = await _service.register(
         fullName: event.fullName,
         email: event.email,
         phone: event.phone,
         vehicleType: event.vehicleType,
         vehicleReg: event.vehicleReg,
         password: event.password,
+        profilePhoto: event.profilePhoto,
+        drivingLicenceFront: event.drivingLicenceFront,
+        drivingLicenceBack: event.drivingLicenceBack,
       );
 
-      emit(RiderSignupSuccess(rider));
+      emit(RiderSignupSuccess(application));
     } catch (error) {
       emit(RiderSignupFailure(
         error.toString().replaceFirst('Exception: ', ''),

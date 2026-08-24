@@ -53,6 +53,17 @@ class AuthService {
   }
 
   // =========================
+  // Send Password Reset Email
+  // =========================
+  Future<void> sendPasswordReset({required String email}) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException {
+      rethrow;
+    }
+  }
+
+  // =========================
   // Current User
   // =========================
   User? get currentUser => _auth.currentUser;

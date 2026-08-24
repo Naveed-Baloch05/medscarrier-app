@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
-
+import 'bloc/admin_login/admin_login_bloc.dart';
 import 'firebase_options.dart';
 import 'bloc/app_bloc.dart';
 import 'bloc/theme/theme_bloc.dart';
@@ -32,9 +32,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (_) => AppBloc()),
+        BlocProvider(
+          create: (_) => AppBloc(),
+        ),
+
         BlocProvider(
           create: (_) => ThemeBloc()..add(ThemeLoaded()),
+        ),
+
+        BlocProvider(
+          create: (_) => AdminLoginBloc(),
         ),
       ],
       child: BlocBuilder<ThemeBloc, ThemeState>(

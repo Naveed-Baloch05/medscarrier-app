@@ -1,4 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../bloc/admin_order/admin_order_bloc.dart';
+import '../../bloc/admin_order/admin_order_event.dart';
+import '../../bloc/admin_order/admin_order_state.dart';
+import '../../bloc/admin_rider/admin_rider_bloc.dart';
+import '../../bloc/admin_rider/admin_rider_event.dart';
+import '../../bloc/admin_rider/admin_rider_state.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -8,101 +17,11 @@ class AdminOrdersScreen extends StatefulWidget {
 }
 
 class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
-  final List<Map<String, dynamic>> _orders = [
-    {
-      'id': '#MC-4822',
-      'pharmacy': 'Camden Pharmacy',
-      'customer': 'James Wilson',
-      'pickup': 'Camden High St, NW1',
-      'dropoff': 'Kentish Town, NW5',
-      'status': 'Awaiting Assignment',
-      'rider': null,
-      'distance': '2.8 km',
-      'eta': '10 min',
-      'controlled': true,
-      'coldChain': false,
-      'time': '8 min ago',
-    },
-    {
-      'id': '#MC-4818',
-      'pharmacy': 'Camden Pharmacy',
-      'customer': 'Alessia Rossi',
-      'pickup': 'Camden High St, NW1',
-      'dropoff': 'Primrose Hill, NW3',
-      'status': 'On the Way',
-      'rider': 'Tom Reilly',
-      'distance': '3.2 km',
-      'eta': '12 min',
-      'controlled': true,
-      'coldChain': true,
-      'time': '18 min ago',
-    },
-    {
-      'id': '#MC-4816',
-      'pharmacy': 'Riverside Pharmacy',
-      'customer': 'Maya Aslam',
-      'pickup': 'Riverside Road, NW1',
-      'dropoff': 'Angel, N1',
-      'status': 'Collecting',
-      'rider': 'Maya Aslam',
-      'distance': '4.1 km',
-      'eta': '15 min',
-      'controlled': false,
-      'coldChain': true,
-      'time': '32 min ago',
-    },
-    {
-      'id': '#MC-4820',
-      'pharmacy': 'Camden Pharmacy',
-      'customer': 'James Wilson',
-      'pickup': 'Camden High St, NW1',
-      'dropoff': 'Kentish Town, NW5',
-      'status': 'Ready',
-      'rider': null,
-      'distance': '0.8 km',
-      'eta': '5 min',
-      'controlled': false,
-      'coldChain': true,
-      'time': '42 min ago',
-    },
-    {
-      'id': '#MC-4815',
-      'pharmacy': 'Central Pharmacy',
-      'customer': 'Oliver Smith',
-      'pickup': 'High Street, NW1',
-      'dropoff': 'Belsize Park, NW3',
-      'status': 'Delivered',
-      'rider': 'Tom Reilly',
-      'distance': '4.6 km',
-      'eta': 'Completed',
-      'controlled': true,
-      'coldChain': false,
-      'time': '1 hr ago',
-    },
-    {
-      'id': '#MC-4812',
-      'pharmacy': 'Wellgate Pharmacy',
-      'customer': 'Sophie Taylor',
-      'pickup': 'Islington Road, N1',
-      'dropoff': 'Hackney, E8',
-      'status': 'Delivered',
-      'rider': 'Maya Aslam',
-      'distance': '5.2 km',
-      'eta': 'Completed',
-      'controlled': false,
-      'coldChain': false,
-      'time': '2 hrs ago',
-    },
-  ];
+  final AdminOrderBloc _orderBloc = AdminOrderBloc();
+  final AdminRiderBloc _riderBloc = AdminRiderBloc();
 
   String _selectedFilter = 'All';
   String _searchQuery = '';
-
-  final List<Map<String, dynamic>> _availableRiders = [
-    {'id': 'RID-1001', 'name': 'Tom Reilly', 'online': true, 'deliveries': 24, 'location': 'Camden High St'},
-    {'id': 'RID-1002', 'name': 'Maya Aslam', 'online': true, 'deliveries': 18, 'location': 'Islington Road'},
-    {'id': 'RID-1003', 'name': 'Ali Khan', 'online': false, 'deliveries': 9, 'location': 'Hackney'},
-  ];
 
   final List<String> _filters = [
     'All',
@@ -111,8 +30,86 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     'Completed',
   ];
 
-  List<Map<String, dynamic>> get _filteredOrders {
-    List<Map<String, dynamic>> result = List.from(_orders);
+  @override
+  void initState() {
+    super.initState();
+    _orderBloc.add(const AdminOrderLoadRequested());
+    _riderBloc.add(const AdminRiderLoadRequested());
+  }
+
+  @override
+  void dispose() {
+    _orderBloc.close();
+    _riderBloc.close();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> _mapOrders(
+    List<Map<String, dynamic>> rawOrders,
+    List<Map<String, dynamic>> riders,
+  ) {
+    return rawOrders.map((order) {
+      final String? riderId = order['riderId']?.toString();
+      String? riderName;
+
+      if (riderId != null && riderId.isNotEmpty) {
+        for (final rider in riders) {
+          if (rider['id']?.toString() == riderId) {
+            riderName = rider['name']?.toString();
+            break;
+          }
+        }
+      }
+      riderName ??= order['riderName']?.toString();
+
+      final String status = order['status']?.toString() ?? '';
+      String eta = order['estimatedTime']?.toString() ?? '';
+      if (eta.isEmpty && status == 'Delivered') {
+        eta = 'Completed';
+      }
+
+      return <String, dynamic>{
+        'id': order['id']?.toString() ?? '',
+        'pharmacy': order['pharmacyName']?.toString() ?? '',
+        'customer': order['customerName']?.toString() ?? '',
+        'pickup': order['pickupAddress']?.toString() ?? '',
+        'dropoff': order['dropoffAddress']?.toString() ?? '',
+        'status': status,
+        'rider': (riderName != null && riderName.isNotEmpty) ? riderName : null,
+        'distance': order['distance']?.toString() ?? '',
+        'eta': eta,
+        'controlled': order['controlledDrug'] == true,
+        'coldChain': order['coldChain'] == true,
+        'time': _relativeTime(order['createdAt']),
+      };
+    }).toList();
+  }
+
+  DateTime? _parseDateTime(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  String _relativeTime(dynamic createdAt) {
+    final DateTime? created = _parseDateTime(createdAt);
+    if (created == null) return '';
+
+    final difference = DateTime.now().difference(created);
+
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes} min ago';
+    if (difference.inHours < 24) {
+      return difference.inHours == 1
+          ? '1 hr ago'
+          : '${difference.inHours} hrs ago';
+    }
+    return difference.inDays == 1 ? '1 day ago' : '${difference.inDays} days ago';
+  }
+
+  List<Map<String, dynamic>> _filteredOrders(List<Map<String, dynamic>> orders) {
+    List<Map<String, dynamic>> result = List.from(orders);
 
     if (_selectedFilter == 'Awaiting') {
       result = result.where((order) {
@@ -157,184 +154,238 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AdminOrderBloc>.value(value: _orderBloc),
+        BlocProvider<AdminRiderBloc>.value(value: _riderBloc),
+      ],
+      child: BlocBuilder<AdminOrderBloc, AdminOrderState>(
+        buildWhen: (previous, current) => current is! AdminOrderOperationSuccess,
+        builder: (context, orderState) {
 
-    // Surface and scaffold colors explicitly defined for maximum clarity
-    final scaffoldBg = isDark ? const Color(0xFF08100C) : const Color(0xFFF2F5F3);
-    final cardBg = isDark ? const Color(0xFF0E1A14) : Colors.white;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
-
-    final orders = _filteredOrders;
-
-    final awaitingCount = _orders.where((order) {
-      final status = order['status']?.toString() ?? '';
-      return status == 'Awaiting Assignment' || status == 'Ready';
-    }).length;
-
-    final activeCount = _orders.where((order) {
-      final status = order['status']?.toString() ?? '';
-      return status == 'Assigned' ||
-          status == 'Collecting' ||
-          status == 'Picked Up' ||
-          status == 'On the Way';
-    }).length;
-
-    final completedCount = _orders.where((order) {
-      return order['status']?.toString() == 'Delivered';
-    }).length;
-
-    return Scaffold(
-      backgroundColor: scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: scaffoldBg,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          'Orders',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: textPrimary,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, color: textPrimary),
-            onPressed: () => setState(() {}),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // SUMMARY
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Row(
-              children: [
-                _summaryItem(context, '${_orders.length}', 'Total', cardBg, isDark),
-                const SizedBox(width: 8),
-                _summaryItem(context, '$awaitingCount', 'Awaiting', cardBg, isDark),
-                const SizedBox(width: 8),
-                _summaryItem(context, '$activeCount', 'Active', cardBg, isDark),
-                const SizedBox(width: 8),
-                _summaryItem(context, '$completedCount', 'Done', cardBg, isDark),
-              ],
-            ),
-          ),
-
-          // SEARCH
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              style: TextStyle(color: textPrimary, fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Search order, pharmacy, rider...',
-                hintStyle: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? const Color(0xFF8B9B94) : Colors.grey.shade600,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: 20,
-                  color: isDark ? const Color(0xFF8B9B94) : Colors.grey.shade600,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                    });
-                  },
-                  icon: const Icon(Icons.close, size: 18),
-                )
-                    : null,
-                filled: true,
-                fillColor: cardBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
-                    width: 1.5,
+          if (orderState is AdminOrderError) {
+            final errorIsDark = Theme.of(context).brightness == Brightness.dark;
+            final scaffoldBg =
+                errorIsDark ? const Color(0xFF08100C) : const Color(0xFFF2F5F3);
+            return Scaffold(
+              backgroundColor: scaffoldBg,
+              appBar: AppBar(
+                backgroundColor: scaffoldBg,
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+              ),
+              body: Center(
+                child: Text(
+                  orderState.message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color:
+                        errorIsDark ? const Color(0xFF8B9B94) : Colors.grey,
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          }
 
-          const SizedBox(height: 12),
+          return BlocBuilder<AdminRiderBloc, AdminRiderState>(
+            buildWhen: (previous, current) =>
+                current is! AdminRiderOperationSuccess,
+            builder: (context, riderState) {
+              final theme = Theme.of(context);
+              final isDark = theme.brightness == Brightness.dark;
 
-          // FILTERS
-          SizedBox(
-            height: 42,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              itemCount: _filters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final filter = _filters[index];
-                int count;
+              // Surface and scaffold colors explicitly defined for maximum clarity
+              final scaffoldBg =
+                  isDark ? const Color(0xFF08100C) : const Color(0xFFF2F5F3);
+              final cardBg = isDark ? const Color(0xFF0E1A14) : Colors.white;
+              final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
 
-                switch (filter) {
-                  case 'Awaiting':
-                    count = awaitingCount;
-                    break;
-                  case 'Active':
-                    count = activeCount;
-                    break;
-                  case 'Completed':
-                    count = completedCount;
-                    break;
-                  default:
-                    count = _orders.length;
-                }
+              final riders = riderState is AdminRiderLoaded
+                  ? riderState.riders
+                  : const <Map<String, dynamic>>[];
 
-                return _filterChip(context, filter, count, cardBg, isDark);
-              },
-            ),
-          ),
+              final allOrders = orderState is AdminOrderLoaded
+                  ? _mapOrders(orderState.orders, riders)
+                  : const <Map<String, dynamic>>[];
 
-          const SizedBox(height: 10),
+              final orders = _filteredOrders(allOrders);
 
-          // ORDER LIST
-          Expanded(
-            child: orders.isEmpty
-                ? Center(
-              child: Text(
-                'No orders found',
-                style: TextStyle(
-                  color: isDark ? const Color(0xFF8B9B94) : Colors.grey,
+              final awaitingCount = allOrders.where((order) {
+                final status = order['status']?.toString() ?? '';
+                return status == 'Awaiting Assignment' || status == 'Ready';
+              }).length;
+
+              final activeCount = allOrders.where((order) {
+                final status = order['status']?.toString() ?? '';
+                return status == 'Assigned' ||
+                    status == 'Collecting' ||
+                    status == 'Picked Up' ||
+                    status == 'On the Way';
+              }).length;
+
+              final completedCount = allOrders.where((order) {
+                return order['status']?.toString() == 'Delivered';
+              }).length;
+
+              return Scaffold(
+                backgroundColor: scaffoldBg,
+                appBar: AppBar(
+                  backgroundColor: scaffoldBg,
+                  elevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                  title: Text(
+                    'Orders',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: textPrimary,
+                    ),
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: Icon(Icons.refresh_rounded, color: textPrimary),
+                      onPressed: () {
+                        context.read<AdminOrderBloc>().add(const AdminOrderRefreshed());
+                        context.read<AdminRiderBloc>().add(const AdminRiderRefreshed());
+                      },
+                    ),
+                  ],
                 ),
-              ),
-            )
-                : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 30),
-              itemCount: orders.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                return _buildOrderCard(context, orders[index], cardBg, isDark);
-              },
-            ),
-          ),
-        ],
+                body: Column(
+                  children: [
+                    // SUMMARY
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      child: Row(
+                        children: [
+                          _summaryItem(context, '${allOrders.length}', 'Total', cardBg, isDark),
+                          const SizedBox(width: 8),
+                          _summaryItem(context, '$awaitingCount', 'Awaiting', cardBg, isDark),
+                          const SizedBox(width: 8),
+                          _summaryItem(context, '$activeCount', 'Active', cardBg, isDark),
+                          const SizedBox(width: 8),
+                          _summaryItem(context, '$completedCount', 'Done', cardBg, isDark),
+                        ],
+                      ),
+                    ),
+
+                    // SEARCH
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                        style: TextStyle(color: textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'Search order, pharmacy, rider...',
+                          hintStyle: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF8B9B94) : Colors.grey.shade600,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            size: 20,
+                            color: isDark ? const Color(0xFF8B9B94) : Colors.grey.shade600,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                            icon: const Icon(Icons.close, size: 18),
+                          )
+                              : null,
+                          filled: true,
+                          fillColor: cardBg,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // FILTERS
+                    SizedBox(
+                      height: 42,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _filters.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final filter = _filters[index];
+                          int count;
+
+                          switch (filter) {
+                            case 'Awaiting':
+                              count = awaitingCount;
+                              break;
+                            case 'Active':
+                              count = activeCount;
+                              break;
+                            case 'Completed':
+                              count = completedCount;
+                              break;
+                            default:
+                              count = allOrders.length;
+                          }
+
+                          return _filterChip(context, filter, count, cardBg, isDark);
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // ORDER LIST
+                    Expanded(
+                      child: orders.isEmpty
+                          ? Center(
+                        child: Text(
+                          'No orders found',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF8B9B94) : Colors.grey,
+                          ),
+                        ),
+                      )
+                          : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 30),
+                        itemCount: orders.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          return _buildOrderCard(context, orders[index], cardBg, isDark);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -834,6 +885,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final cardBg = isDark ? const Color(0xFF0E1A14) : Colors.white;
     final borderColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
 
+    final riderState = context.read<AdminRiderBloc>().state;
+    final riders = riderState is AdminRiderLoaded
+        ? riderState.riders
+        : const <Map<String, dynamic>>[];
+
     showModalBottomSheet(
       context: context,
       backgroundColor: cardBg,
@@ -869,7 +925,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
                 const SizedBox(height: 18),
-                ..._availableRiders.map((rider) {
+                ...riders.map((rider) {
                   final online = rider['online'] == true;
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -906,7 +962,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: online
-                                  ? (isDark ? const Color(0xFF15301D) : const Color(0xFFE8F5E9))
+                                  ? (isDark ? const Color(0xFF1D322A) : const Color(0xFFE8F5E9))
                                   : Colors.grey.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -968,10 +1024,12 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             ),
             TextButton(
               onPressed: () {
-                setState(() {
-                  order['rider'] = rider['name'];
-                  order['status'] = 'Assigned';
-                });
+                context.read<AdminOrderBloc>().add(
+                  AdminOrderAssigned(
+                    order['id'].toString(),
+                    rider['id'].toString(),
+                  ),
+                );
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -989,29 +1047,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   void _autoAssignRider(Map<String, dynamic> order) {
-    final onlineRiders = _availableRiders.where((r) => r['online'] == true).toList();
-
-    if (onlineRiders.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No riders available online.')),
-      );
-      return;
-    }
-
-    final bestRider = onlineRiders.reduce((a, b) =>
-        (a['deliveries'] as int) <= (b['deliveries'] as int) ? a : b);
-
-    setState(() {
-      order['rider'] = bestRider['name'];
-      order['status'] = 'Assigned';
-    });
+    context.read<AdminOrderBloc>().add(
+      AdminOrderAutoAssigned(order['id'].toString()),
+    );
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Auto-assigned to ${bestRider['name']}'),
+        content: const Text('Auto-assignment in progress.'),
         backgroundColor: primaryColor,
       ),
     );

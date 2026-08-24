@@ -29,10 +29,6 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
       email: _emailController.text.trim(),
       password: _passwordController.text,
     ));
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const RiderHomeScreen()),
-    );
   }
 
   double _scale(BuildContext context) {
@@ -63,7 +59,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Welcome back, ${state.rider.fullName}!'),
-                        backgroundColor: cs.primary,
+                        backgroundColor: const Color(0xFF0F7253),
                       ),
                     );
                     Navigator.of(context).pushReplacement(
@@ -96,12 +92,12 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                             width: 60 * scale,
                             height: 60 * scale,
                             decoration: BoxDecoration(
-                              color: cs.primary.withValues(alpha: 0.1),
+                              color: const Color(0xFF0F7253).withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.delivery_dining_rounded,
-                              color: cs.primary,
+                              color: const Color(0xFF0F7253),
                               size: 30 * scale,
                             ),
                           ),
@@ -159,7 +155,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                               child: Text(
                                 'Forgot password?',
                                 style: TextStyle(
-                                  color: cs.primary,
+                                  color: const Color(0xFF0F7253),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -177,10 +173,10 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                                 height: 54 * scale,
                                 child: ElevatedButton(
                                   onPressed: isLoading ? null : () => _submit(context),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: cs.primary,
-                                    foregroundColor: isDark ? const Color(0xFF0C1310) : Colors.white,
-                                    disabledBackgroundColor: cs.primary.withValues(alpha: 0.5),
+                                   style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F7253),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: const Color(0xFF0F7253).withValues(alpha: 0.5),
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
@@ -225,7 +221,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                                 child: Text(
                                   'Sign up',
                                   style: TextStyle(
-                                    color: cs.primary,
+                                    color: const Color(0xFF0F7253),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13.5,
                                   ),

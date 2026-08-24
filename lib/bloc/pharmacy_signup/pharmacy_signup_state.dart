@@ -1,4 +1,4 @@
-import '../../models/pharmacy_model.dart';
+import '../../models/pharmacy_application_model.dart';
 
 abstract class PharmacySignupState {
   const PharmacySignupState();
@@ -13,9 +13,9 @@ class PharmacySignupLoading extends PharmacySignupState {
 }
 
 class PharmacySignupSuccess extends PharmacySignupState {
-  const PharmacySignupSuccess(this.pharmacy);
+  const PharmacySignupSuccess(this.application);
 
-  final PharmacyModel pharmacy;
+  final PharmacyApplicationModel application;
 }
 
 class PharmacySignupFailure extends PharmacySignupState {

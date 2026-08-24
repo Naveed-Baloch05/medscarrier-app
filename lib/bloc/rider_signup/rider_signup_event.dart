@@ -1,3 +1,5 @@
+import 'dart:io';
+
 abstract class RiderSignupEvent {
   const RiderSignupEvent();
 }
@@ -10,6 +12,9 @@ class RiderSignupSubmitted extends RiderSignupEvent {
     required this.vehicleType,
     required this.vehicleReg,
     required this.password,
+    this.profilePhoto,
+    this.drivingLicenceFront,
+    this.drivingLicenceBack,
   });
 
   final String fullName;
@@ -18,6 +23,9 @@ class RiderSignupSubmitted extends RiderSignupEvent {
   final String vehicleType;
   final String vehicleReg;
   final String password;
+  final File? profilePhoto;
+  final File? drivingLicenceFront;
+  final File? drivingLicenceBack;
 }
 
 class RiderSignupReset extends RiderSignupEvent {

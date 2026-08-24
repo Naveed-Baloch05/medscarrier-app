@@ -21,17 +21,17 @@ class PharmacySignupBloc extends Bloc<PharmacySignupEvent, PharmacySignupState> 
     emit(const PharmacySignupLoading());
 
     try {
-      final pharmacy = await _service.register(
+      final application = await _service.submitApplication(
         pharmacyName: event.pharmacyName,
         contactName: event.contactName,
         email: event.email,
         phone: event.phone,
         businessAddress: event.businessAddress,
         gphcNumber: event.gphcNumber,
-        password: event.password,
+        licenseDocument: event.licenseDocument,
       );
 
-      emit(PharmacySignupSuccess(pharmacy));
+      emit(PharmacySignupSuccess(application));
     } catch (error) {
       emit(PharmacySignupFailure(
         error.toString().replaceFirst('Exception: ', ''),

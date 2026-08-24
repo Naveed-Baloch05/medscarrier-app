@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../bloc/admin_pharmacy/admin_pharmacy_bloc.dart';
+import '../../bloc/admin_pharmacy/admin_pharmacy_event.dart';
+import '../../bloc/admin_pharmacy/admin_pharmacy_state.dart';
+import '../../models/pharmacy_application_model.dart';
 
 class AdminPharmacyManagementScreen extends StatefulWidget {
   const AdminPharmacyManagementScreen({
@@ -12,60 +17,25 @@ class AdminPharmacyManagementScreen extends StatefulWidget {
 
 class _AdminPharmacyManagementScreenState
     extends State<AdminPharmacyManagementScreen> {
-  // ============================================================
-  // TEMPORARY DATA
-  // Backend/API will replace this later.
-  // ============================================================
-
-  final List<Map<String, dynamic>> _pharmacies = [
-    {
-      'id': 'PH-1001',
-      'name': 'MedCare Pharmacy',
-      'pharmacist': 'Naveed Baloch',
-      'phone': '+92 300 1234567',
-      'email': 'pharmacy@example.com',
-      'address': 'Main Market, Lahore',
-      'license': 'PH-2026-00125',
-      'status': 'Approved',
-      'active': true,
-    },
-    {
-      'id': 'PH-1002',
-      'name': 'City Pharmacy',
-      'pharmacist': 'Ahmed Khan',
-      'phone': '+92 301 9876543',
-      'email': 'city@example.com',
-      'address': 'Gulberg, Lahore',
-      'license': 'PH-2026-00126',
-      'status': 'Pending',
-      'active': false,
-    },
-    {
-      'id': 'PH-1003',
-      'name': 'HealthCare Pharmacy',
-      'pharmacist': 'Ali Raza',
-      'phone': '+92 302 4567890',
-      'email': 'healthcare@example.com',
-      'address': 'Model Town, Lahore',
-      'license': 'PH-2026-00127',
-      'status': 'Approved',
-      'active': true,
-    },
-    {
-      'id': 'PH-1004',
-      'name': 'Green Life Pharmacy',
-      'pharmacist': 'Usman Khan',
-      'phone': '+92 303 1112233',
-      'email': 'greenlife@example.com',
-      'address': 'Johar Town, Lahore',
-      'license': 'PH-2026-00128',
-      'status': 'Rejected',
-      'active': false,
-    },
-  ];
-
+  late final AdminPharmacyBloc _pharmacyBloc;
   String _selectedFilter = 'All';
   String _searchQuery = '';
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _pharmacyBloc = AdminPharmacyBloc()..add(const AdminPharmacyLoadRequested());
+  }
+
+  @override
+  void dispose() {
+    _pharmacyBloc.close();
+    super.dispose();
+  }
 
   // ============================================================
   // COLORS
@@ -85,7 +55,7 @@ class _AdminPharmacyManagementScreenState
 
   Color _primaryColor(bool isDark) {
     return isDark
-        ? const Color(0xFF32C787)
+        ? const Color(0xFF0F7253)
         : const Color(0xFF0F7253);
   }
 
@@ -116,10 +86,28 @@ class _AdminPharmacyManagementScreenState
     final isDark =
         Theme.of(context).brightness == Brightness.dark;
 
-    final filteredPharmacies =
-    _filteredPharmacies();
+    return BlocProvider<AdminPharmacyBloc>.value(
+      value: _pharmacyBloc,
+      child: BlocBuilder<AdminPharmacyBloc, AdminPharmacyState>(
+      builder: (context, state) {
+        final List<Map<String, dynamic>> pharmacies;
+        final List<PharmacyApplicationModel> pendingApplications;
 
-    return Scaffold(
+        if (state is AdminPharmacyLoadedWithApplications) {
+          pharmacies = _mapPharmacyData(state.pharmacies);
+          pendingApplications = state.pendingApplications;
+        } else if (state is AdminPharmacyLoaded) {
+          pharmacies = _mapPharmacyData(state.pharmacies);
+          pendingApplications = [];
+        } else {
+          pharmacies = <Map<String, dynamic>>[];
+          pendingApplications = [];
+        }
+
+        final filteredPharmacies =
+        _filteredPharmacies(pharmacies);
+
+        return Scaffold(
       backgroundColor: _backgroundColor(isDark),
 
       // ========================================================
@@ -146,7 +134,9 @@ class _AdminPharmacyManagementScreenState
         actions: [
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: _primaryText(isDark)),
-            onPressed: () => setState(() {}),
+            onPressed: () => context
+                .read<AdminPharmacyBloc>()
+                .add(const AdminPharmacyRefreshed()),
           ),
         ],
       ),
@@ -168,9 +158,62 @@ class _AdminPharmacyManagementScreenState
             // SUMMARY
             // ====================================================
 
-            _buildSummary(isDark),
+            _buildSummary(pharmacies, isDark),
 
             const SizedBox(height: 22),
+
+            // ====================================================
+            // PENDING PHARMACY APPLICATIONS
+            // ====================================================
+
+            if (pendingApplications.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(
+                    Icons.how_to_reg_rounded,
+                    size: 18,
+                    color: Color(0xFFFF9800),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pending Applications',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _primaryText(isDark),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9800)
+                          .withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${pendingApplications.length}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFFF9800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...pendingApplications.map(
+                (app) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildApplicationCard(app, isDark),
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
 
             // ====================================================
             // SEARCH
@@ -237,31 +280,60 @@ class _AdminPharmacyManagementScreenState
           ],
         ),
       ),
+        );
+      },
+    ),
     );
+  }
+
+  // ============================================================
+  // MAP BLOC DATA
+  // Maps backend keys to the keys used by the UI.
+  // ============================================================
+
+  List<Map<String, dynamic>> _mapPharmacyData(
+      List<Map<String, dynamic>> pharmacies,
+      ) {
+    return pharmacies.map((pharmacy) {
+      return <String, dynamic>{
+        'id': pharmacy['id'],
+        'name': pharmacy['pharmacyName'] ?? '',
+        'pharmacist': pharmacy['contactName'] ?? '',
+        'email': pharmacy['email'] ?? '',
+        'phone': pharmacy['phone'] ?? '',
+        'address': pharmacy['businessAddress'] ?? '',
+        'license': pharmacy['gphcNumber'] ?? '',
+        'status': pharmacy['status'] ?? 'Pending',
+        'active': pharmacy['active'] == true,
+      };
+    }).toList();
   }
 
   // ============================================================
   // SUMMARY
   // ============================================================
 
-  Widget _buildSummary(bool isDark) {
-    final total = _pharmacies.length;
+  Widget _buildSummary(
+      List<Map<String, dynamic>> pharmacies,
+      bool isDark,
+      ) {
+    final total = pharmacies.length;
 
-    final approved = _pharmacies
+    final approved = pharmacies
         .where(
           (pharmacy) =>
       pharmacy['status'] == 'Approved',
     )
         .length;
 
-    final pending = _pharmacies
+    final pending = pharmacies
         .where(
           (pharmacy) =>
       pharmacy['status'] == 'Pending',
     )
         .length;
 
-    final active = _pharmacies
+    final active = pharmacies
         .where(
           (pharmacy) =>
       pharmacy['active'] == true,
@@ -709,7 +781,7 @@ class _AdminPharmacyManagementScreenState
                         BoxDecoration(
                           color: active
                               ? const Color(
-                            0xFF32C787,
+                            0xFF0F7253,
                           )
                               : Colors.grey,
                           shape: BoxShape.circle,
@@ -818,7 +890,7 @@ class _AdminPharmacyManagementScreenState
     switch (status) {
       case 'Approved':
         background =
-            const Color(0xFF32C787)
+            const Color(0xFF0F7253)
                 .withOpacity(0.12);
         text = _primaryColor(isDark);
         break;
@@ -873,9 +945,11 @@ class _AdminPharmacyManagementScreenState
   // ============================================================
 
   List<Map<String, dynamic>>
-  _filteredPharmacies() {
+  _filteredPharmacies(
+      List<Map<String, dynamic>> pharmacies,
+      ) {
     Iterable<Map<String, dynamic>>
-    result = _pharmacies;
+    result = pharmacies;
 
     // Status filter
     if (_selectedFilter == 'Inactive') {
@@ -1396,12 +1470,14 @@ class _AdminPharmacyManagementScreenState
                         ctx,
                       );
 
-                      setState(() {
-                        pharmacy['status'] =
-                        'Approved';
-                        pharmacy['active'] =
-                        true;
-                      });
+                      context
+                          .read<
+                          AdminPharmacyBloc>()
+                          .add(
+                        AdminPharmacyApproved(
+                          pharmacy['id'],
+                        ),
+                      );
 
                       _showMessage(
                         'Pharmacy approved.',
@@ -1471,11 +1547,14 @@ class _AdminPharmacyManagementScreenState
                           isDark,
                         );
                       } else {
-                        setState(() {
-                          pharmacy[
-                          'active'] =
-                          true;
-                        });
+                        context
+                            .read<
+                            AdminPharmacyBloc>()
+                            .add(
+                          AdminPharmacyActivated(
+                            pharmacy['id'],
+                          ),
+                        );
 
                         _showMessage(
                           'Pharmacy activated.',
@@ -1625,10 +1704,14 @@ class _AdminPharmacyManagementScreenState
 
             TextButton(
               onPressed: () {
-                setState(() {
-                  pharmacy['active'] =
-                  false;
-                });
+                context
+                    .read<
+                    AdminPharmacyBloc>()
+                    .add(
+                  AdminPharmacyDeactivated(
+                    pharmacy['id'],
+                  ),
+                );
 
                 Navigator.pop(ctx);
 
@@ -1703,12 +1786,14 @@ class _AdminPharmacyManagementScreenState
 
             TextButton(
               onPressed: () {
-                setState(() {
-                  pharmacy['status'] =
-                  'Rejected';
-                  pharmacy['active'] =
-                  false;
-                });
+                context
+                    .read<
+                    AdminPharmacyBloc>()
+                    .add(
+                  AdminPharmacyRejected(
+                    pharmacy['id'],
+                  ),
+                );
 
                 Navigator.pop(ctx);
 
@@ -1865,14 +1950,19 @@ class _AdminPharmacyManagementScreenState
                           return;
                         }
 
-                        setState(() {
-                          pharmacy['name'] = name;
-                          pharmacy['pharmacist'] = pharmacist;
-                          pharmacy['phone'] = phone;
-                          pharmacy['email'] = email;
-                          pharmacy['address'] = address;
-                          pharmacy['license'] = license;
-                        });
+                        _pharmacyBloc.add(
+                          AdminPharmacyUpdated(
+                            pharmacy['id'],
+                            {
+                              'pharmacyName': name,
+                              'contactName': pharmacist,
+                              'phone': phone,
+                              'email': email,
+                              'businessAddress': address,
+                              'gphcNumber': license,
+                            },
+                          ),
+                        );
 
                         Navigator.pop(ctx);
                         _showMessage('$name updated successfully.');
@@ -1885,6 +1975,494 @@ class _AdminPharmacyManagementScreenState
                       icon: const Icon(Icons.save_outlined, size: 19),
                       label: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // APPLICATION CARD (pending pharmacy applications)
+  // ============================================================
+
+  Widget _buildApplicationCard(
+    PharmacyApplicationModel app,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _cardColor(isDark),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.local_pharmacy_outlined,
+                  size: 26,
+                  color: Color(0xFFFF9800),
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      app.pharmacyName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _primaryText(isDark),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Applied ${_formatAppliedDate(app.submittedAt)}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _secondaryText(isDark),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Pending',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFFF9800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _detailRow(
+            Icons.email_outlined,
+            app.email,
+            isDark,
+          ),
+          const SizedBox(height: 8),
+          _detailRow(
+            Icons.phone_outlined,
+            app.phone,
+            isDark,
+          ),
+          const SizedBox(height: 8),
+          _detailRow(
+            Icons.badge_outlined,
+            app.gphcNumber,
+            isDark,
+          ),
+          const SizedBox(height: 12),
+          Divider(height: 1, color: _borderColor(isDark)),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () => _showApplicationDetails(app, isDark),
+                  icon: Icon(
+                    Icons.visibility_outlined,
+                    size: 16,
+                    color: _secondaryText(isDark),
+                  ),
+                  label: Text(
+                    'View Details',
+                    style: TextStyle(
+                      color: _secondaryText(isDark),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 22,
+                color: _borderColor(isDark),
+              ),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () => _showRejectApplicationDialog(app, isDark),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: Colors.red.shade600,
+                  ),
+                  label: Text(
+                    'Reject',
+                    style: TextStyle(
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 22,
+                color: _borderColor(isDark),
+              ),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () => _approveApplication(app, isDark),
+                  icon: const Icon(
+                    Icons.check_circle_outline,
+                    size: 16,
+                    color: Color(0xFF0F7253),
+                  ),
+                  label: const Text(
+                    'Approve',
+                    style: TextStyle(
+                      color: Color(0xFF0F7253),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatAppliedDate(DateTime? date) {
+    if (date == null) return 'recently';
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _approveApplication(PharmacyApplicationModel app, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: _cardColor(isDark),
+          title: Text(
+            'Approve Application',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: _primaryText(isDark),
+            ),
+          ),
+          content: Text(
+            'Approve ${app.pharmacyName}\'s pharmacy application? '
+            'This will create their login account and send a password reset email.',
+            style: TextStyle(color: _secondaryText(isDark)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: _primaryText(isDark)),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                _pharmacyBloc.add(
+                  AdminPharmacyApplicationApprove(app.applicationId),
+                );
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Pharmacy application approved.'),
+                    backgroundColor: Color(0xFF0F7253),
+                  ),
+                );
+              },
+              child: const Text(
+                'Approve',
+                style: TextStyle(
+                  color: Color(0xFF0F7253),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRejectApplicationDialog(
+    PharmacyApplicationModel app,
+    bool isDark,
+  ) {
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: _cardColor(isDark),
+          title: Text(
+            'Reject Application',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: _primaryText(isDark),
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Reject ${app.pharmacyName}\'s pharmacy application?',
+                style: TextStyle(color: _secondaryText(isDark)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Rejection reason (optional)',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: _secondaryText(isDark),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: _primaryText(isDark)),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                _pharmacyBloc.add(
+                  AdminPharmacyApplicationReject(
+                    app.applicationId,
+                    reasonController.text.trim(),
+                  ),
+                );
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Pharmacy application rejected.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              },
+              child: Text(
+                'Reject',
+                style: TextStyle(
+                  color: Colors.red.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showApplicationDetails(
+    PharmacyApplicationModel app,
+    bool isDark,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _cardColor(isDark),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(25),
+        ),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 28),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _secondaryText(isDark).withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF9800).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.local_pharmacy_outlined,
+                          color: Color(0xFFFF9800),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              app.pharmacyName,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: _primaryText(isDark),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              app.contactName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _secondaryText(isDark),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  _bottomDetail('Application ID', app.applicationId, isDark),
+                  _bottomDetail('Contact Name', app.contactName, isDark),
+                  _bottomDetail('Phone', app.phone, isDark),
+                  _bottomDetail('Email', app.email, isDark),
+                  _bottomDetail('Address', app.businessAddress, isDark),
+                  _bottomDetail('GPhC Number', app.gphcNumber, isDark),
+                  if (app.licenseDocumentUrl != null &&
+                      app.licenseDocumentUrl!.isNotEmpty)
+                    _bottomDetail('License Document', app.licenseDocumentUrl!, isDark),
+                  _bottomDetail(
+                    'Submitted',
+                    app.submittedAt != null
+                        ? '${app.submittedAt!.day}/${app.submittedAt!.month}/${app.submittedAt!.year}'
+                        : 'Unknown',
+                    isDark,
+                  ),
+                  _bottomDetail('Status', app.status, isDark),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showRejectApplicationDialog(app, isDark);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade600,
+                            side: BorderSide(color: Colors.red.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: Colors.red.shade600,
+                          ),
+                          label: Text(
+                            'Reject',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.red.shade600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _approveApplication(app, isDark);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F7253),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Approve',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

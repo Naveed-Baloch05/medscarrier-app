@@ -1,5 +1,11 @@
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../bloc/admin_rider/admin_rider_bloc.dart';
+import '../../bloc/admin_rider/admin_rider_event.dart';
+import '../../bloc/admin_rider/admin_rider_state.dart';
+import '../../models/rider_application_model.dart';
 
 class AdminRiderManagementScreen extends StatefulWidget {
 const AdminRiderManagementScreen({
@@ -13,49 +19,8 @@ _AdminRiderManagementScreenState();
 
 class _AdminRiderManagementScreenState
 extends State<AdminRiderManagementScreen> {
-// ============================================================
-// TEMPORARY RIDER DATA
-// Backend/API will be connected later.
-// ============================================================
 
-final List<Map<String, dynamic>> _riders = [
-{
-'id': 'RID-1001',
-'name': 'Naveed Baloch',
-'phone': '+92 300 1234567',
-'email': 'naveed@example.com',
-'status': 'Active',
-'online': true,
-'deliveries': 24,
-'currentOrder': '#MC-4818',
-'location': 'Camden High St',
-'lastSeen': 'Live now',
-},
-{
-'id': 'RID-1002',
-'name': 'Ali Ahmed',
-'phone': '+92 301 7654321',
-'email': 'ali@example.com',
-'status': 'Active',
-'online': false,
-'deliveries': 18,
-'currentOrder': null,
-'location': 'Islington Road',
-'lastSeen': '8 min ago',
-},
-{
-'id': 'RID-1003',
-'name': 'Usman Khan',
-'phone': '+92 302 9876543',
-'email': 'usman@example.com',
-'status': 'Inactive',
-'online': false,
-'deliveries': 9,
-'currentOrder': null,
-'location': 'Hackney',
-'lastSeen': '2 hrs ago',
-},
-];
+late final AdminRiderBloc _riderBloc;
 
 String _searchQuery = '';
 String _selectedFilter = 'All';
@@ -69,11 +34,110 @@ final List<String> _filters = [
 ];
 
 // ============================================================
+// INIT STATE
+// ============================================================
+
+@override
+void initState() {
+super.initState();
+_riderBloc = AdminRiderBloc()..add(const AdminRiderLoadRequested());
+}
+
+@override
+void dispose() {
+_riderBloc.close();
+super.dispose();
+}
+
+// ============================================================
+// MAP BACKEND RIDERS FOR UI
+// Backend keys -> keys expected by the UI below.
+// ============================================================
+
+List<Map<String, dynamic>> _mapRidersForUi(
+List<Map<String, dynamic>> backendRiders,
+) {
+return backendRiders.map((rider) {
+final bool online =
+    rider['online'] == true;
+
+return <String, dynamic>{
+'id': rider['id'] ?? '',
+'name':
+    (rider['fullName'] ?? '').toString(),
+'phone':
+    (rider['phone'] ?? '').toString(),
+'email':
+    (rider['email'] ?? '').toString(),
+'status': rider['active'] == false
+    ? 'Inactive'
+    : 'Active',
+'online': online,
+'deliveries': rider['deliveries'] ?? 0,
+'currentOrder': rider['currentOrder'],
+'location': rider['location'] ??
+    'Location unavailable',
+'lastSeen': _formatLastSeen(
+rider['lastSeen'],
+online,
+),
+};
+}).toList();
+}
+
+// ============================================================
+// FORMAT LAST SEEN
+// ============================================================
+
+String _formatLastSeen(
+dynamic lastSeen,
+bool online,
+) {
+if (online) {
+return 'Live now';
+}
+
+DateTime? time;
+
+if (lastSeen is Timestamp) {
+time = lastSeen.toDate();
+} else if (lastSeen is DateTime) {
+time = lastSeen;
+} else if (lastSeen is String &&
+lastSeen.trim().isNotEmpty) {
+time = DateTime.tryParse(lastSeen);
+
+if (time == null) {
+return lastSeen;
+}
+}
+
+if (time == null) {
+return 'Unknown';
+}
+
+final difference =
+DateTime.now().difference(time);
+
+if (difference.inMinutes < 1) {
+return 'Just now';
+} else if (difference.inMinutes < 60) {
+return '${difference.inMinutes} min ago';
+} else if (difference.inHours < 24) {
+return '${difference.inHours} hrs ago';
+}
+
+return '${difference.inDays} days ago';
+}
+
+// ============================================================
 // FILTERED RIDERS
 // ============================================================
 
-List<Map<String, dynamic>> get _filteredRiders {
-List<Map<String, dynamic>> result = List.from(_riders);
+List<Map<String, dynamic>> _filteredRiders(
+List<Map<String, dynamic>> riders,
+) {
+List<Map<String, dynamic>> result = List.from(riders);
 
 switch (_selectedFilter) {
 case 'Online':
@@ -153,26 +217,44 @@ final textSecondary = isDark
     : const Color(0xFF6E7A75);
 
 final primaryColor = isDark
-? const Color(0xFF32C787)
+? const Color(0xFF0F7253)
     : const Color(0xFF0F7253);
 
 final borderColor = isDark
 ? Colors.white.withValues(alpha: 0.06)
     : Colors.black.withValues(alpha: 0.05);
 
-final activeRiders = _riders
+return BlocProvider<AdminRiderBloc>.value(
+value: _riderBloc,
+child: BlocBuilder<AdminRiderBloc, AdminRiderState>(
+builder: (context, state) {
+final List<Map<String, dynamic>> allRiders;
+final List<RiderApplicationModel> pendingApplications;
+
+if (state is AdminRiderLoadedWithApplications) {
+  allRiders = _mapRidersForUi(state.riders);
+  pendingApplications = state.pendingApplications;
+} else if (state is AdminRiderLoaded) {
+  allRiders = _mapRidersForUi(state.riders);
+  pendingApplications = [];
+} else {
+  allRiders = <Map<String, dynamic>>[];
+  pendingApplications = [];
+}
+
+final activeRiders = allRiders
     .where((rider) => rider['status'] == 'Active')
     .length;
 
-final onlineRiders = _riders
+final onlineRiders = allRiders
     .where((rider) => rider['online'] == true)
     .length;
 
-final assignedRiders = _riders
+final assignedRiders = allRiders
     .where((rider) => rider['currentOrder'] != null)
     .length;
 
-final riders = _filteredRiders;
+final riders = _filteredRiders(allRiders);
 
 return Scaffold(
 backgroundColor: bgColor,
@@ -198,7 +280,9 @@ color: textPrimary,
 actions: [
 IconButton(
 icon: Icon(Icons.refresh_rounded, color: textPrimary),
-onPressed: () => setState(() {}),
+onPressed: () => context
+    .read<AdminRiderBloc>()
+    .add(const AdminRiderRefreshed()),
 ),
 IconButton(
 tooltip: 'Add Rider',
@@ -236,7 +320,7 @@ Expanded(
 child: _summaryCard(
 icon: Icons.people_outline_rounded,
 title: 'Total',
-value: '${_riders.length}',
+value: '${allRiders.length}',
 cardColor: cardColor,
 borderColor: borderColor,
 textPrimary: textPrimary,
@@ -384,6 +468,66 @@ color: primaryColor,
 const SizedBox(height: 12),
 
 // ====================================================
+// PENDING RIDER APPLICATIONS
+// ====================================================
+
+if (pendingApplications.isNotEmpty) ...[
+  Row(
+    children: [
+      Icon(
+        Icons.how_to_reg_rounded,
+        size: 18,
+        color: const Color(0xFFFF9800),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        'Pending Applications',
+        style: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
+      ),
+      const SizedBox(width: 8),
+      Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 3,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF9800).withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '${pendingApplications.length}',
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFF9800),
+          ),
+        ),
+      ),
+    ],
+  ),
+  const SizedBox(height: 10),
+  ...pendingApplications.map(
+    (app) => Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _buildApplicationCard(
+        app,
+        cardColor: cardColor,
+        borderColor: borderColor,
+        textPrimary: textPrimary,
+        textSecondary: textSecondary,
+        primaryColor: primaryColor,
+        isDark: isDark,
+      ),
+    ),
+  ),
+  const SizedBox(height: 18),
+],
+
+// ====================================================
 // FILTERS
 // ====================================================
 
@@ -401,7 +545,7 @@ int count;
 
 switch (filter) {
 case 'Online':
-count = _riders
+count = allRiders
     .where(
 (rider) =>
 rider['online'] == true,
@@ -410,7 +554,7 @@ rider['online'] == true,
 break;
 
 case 'Offline':
-count = _riders
+count = allRiders
     .where(
 (rider) =>
 rider['online'] == false,
@@ -419,7 +563,7 @@ rider['online'] == false,
 break;
 
 case 'Active':
-count = _riders
+count = allRiders
     .where(
 (rider) =>
 rider['status'] == 'Active',
@@ -428,7 +572,7 @@ rider['status'] == 'Active',
 break;
 
 case 'Inactive':
-count = _riders
+count = allRiders
     .where(
 (rider) =>
 rider['status'] == 'Inactive',
@@ -437,7 +581,7 @@ rider['status'] == 'Inactive',
 break;
 
 default:
-count = _riders.length;
+count = allRiders.length;
 }
 
 return _filterChip(
@@ -525,6 +669,9 @@ isDark: isDark,
 ),
 ],
 ),
+),
+);
+},
 ),
 );
 }
@@ -742,7 +889,7 @@ width: 13,
 height: 13,
 decoration: BoxDecoration(
 color: const Color(
-0xFF32C787,
+0xFF0F7253,
 ),
 shape: BoxShape.circle,
 border: Border.all(
@@ -832,7 +979,7 @@ Icon(
 Icons.location_on_outlined,
 size: 17,
 color: isOnline
-? const Color(0xFF32C787)
+? const Color(0xFF0F7253)
     : textSecondary,
 ),
 const SizedBox(width: 7),
@@ -865,7 +1012,7 @@ rider['lastSeen'].toString(),
 style: TextStyle(
 fontSize: 9,
 color: isOnline
-? const Color(0xFF32C787)
+? const Color(0xFF0F7253)
     : textSecondary,
 fontWeight: FontWeight.w600,
 ),
@@ -1150,6 +1297,516 @@ color: online
 }
 
 // ============================================================
+// APPLICATION CARD (pending rider applications)
+// ============================================================
+
+Widget _buildApplicationCard(
+  RiderApplicationModel app, {
+  required Color cardColor,
+  required Color borderColor,
+  required Color textPrimary,
+  required Color textSecondary,
+  required Color primaryColor,
+  required bool isDark,
+}) {
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: cardColor,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+      ),
+      boxShadow: [
+        if (!isDark)
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // HEADER
+        Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9800).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_outline_rounded,
+                size: 26,
+                color: Color(0xFFFF9800),
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    app.fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Applied ${_formatAppliedDate(app.submittedAt)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 9,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9800).withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Pending',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFFF9800),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // DETAILS
+        _detailRow(
+          icon: Icons.email_outlined,
+          value: app.email,
+          textSecondary: textSecondary,
+        ),
+        const SizedBox(height: 8),
+        _detailRow(
+          icon: Icons.phone_outlined,
+          value: app.phone,
+          textSecondary: textSecondary,
+        ),
+        const SizedBox(height: 8),
+        _detailRow(
+          icon: Icons.directions_car_outlined,
+          value: '${app.vehicleType} — ${app.vehicleRegistrationNumber}',
+          textSecondary: textSecondary,
+        ),
+
+        const SizedBox(height: 12),
+
+        Divider(height: 1, color: borderColor),
+
+        const SizedBox(height: 7),
+
+        // ACTIONS
+        Row(
+          children: [
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () =>
+                    _showApplicationDetails(app),
+                icon: Icon(
+                  Icons.visibility_outlined,
+                  size: 16,
+                  color: textSecondary,
+                ),
+                label: Text(
+                  'View Details',
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 22,
+              color: borderColor,
+            ),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () =>
+                    _showRejectApplicationDialog(app),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: Colors.red.shade600,
+                ),
+                label: Text(
+                  'Reject',
+                  style: TextStyle(
+                    color: Colors.red.shade600,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 22,
+              color: borderColor,
+            ),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () =>
+                    _approveApplication(app),
+                icon: const Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: Color(0xFF0F7253),
+                ),
+                label: const Text(
+                  'Approve',
+                  style: TextStyle(
+                    color: Color(0xFF0F7253),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+String _formatAppliedDate(DateTime? date) {
+  if (date == null) return 'recently';
+  final diff = DateTime.now().difference(date);
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  return '${date.day}/${date.month}/${date.year}';
+}
+
+void _approveApplication(RiderApplicationModel app) {
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text(
+          'Approve Application',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Approve ${app.fullName}\'s rider application? '
+          'This will enable their login account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              _riderBloc.add(
+                AdminRiderApplicationApprove(
+                  app.applicationId,
+                ),
+              );
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Application approved.'),
+                  backgroundColor: Color(0xFF0F7253),
+                ),
+              );
+            },
+            child: const Text(
+              'Approve',
+              style: TextStyle(
+                color: Color(0xFF0F7253),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+void _showRejectApplicationDialog(RiderApplicationModel app) {
+  final reasonController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text(
+          'Reject Application',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reject ${app.fullName}\'s rider application?',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Rejection reason (optional)',
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade400,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              _riderBloc.add(
+                AdminRiderApplicationReject(
+                  app.applicationId,
+                  reasonController.text.trim(),
+                ),
+              );
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Application rejected.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            },
+            child: Text(
+              'Reject',
+              style: TextStyle(
+                color: Colors.red.shade600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+void _showApplicationDetails(RiderApplicationModel app) {
+  final theme = Theme.of(context);
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: theme.cardColor,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(25),
+      ),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            20, 15, 20, 30,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 27,
+                      backgroundColor: const Color(0xFFFF9800)
+                          .withValues(alpha: 0.12),
+                      child: const Icon(
+                        Icons.person_outline,
+                        color: Color(0xFFFF9800),
+                        size: 27,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            app.fullName,
+                            style: const TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            app.email,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Application Details',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _detailItem('Full Name', app.fullName),
+                _detailItem('Email', app.email),
+                _detailItem('Phone', app.phone),
+                _detailItem('Vehicle Type', app.vehicleType),
+                _detailItem(
+                  'Registration',
+                  app.vehicleRegistrationNumber,
+                ),
+                _detailItem(
+                  'Submitted',
+                  app.submittedAt != null
+                      ? '${app.submittedAt!.day}/${app.submittedAt!.month}/${app.submittedAt!.year}'
+                      : 'Unknown',
+                ),
+                _detailItem(
+                  'Terms Accepted',
+                  app.termsAccepted ? 'Yes' : 'No',
+                ),
+                _detailItem(
+                  'Right to Work Consent',
+                  app.rightToWorkConsent ? 'Yes' : 'No',
+                ),
+                _detailItem(
+                  'Background Check Consent',
+                  app.backgroundCheckConsent ? 'Yes' : 'No',
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showRejectApplicationDialog(app);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade600,
+                          side: BorderSide(
+                            color: Colors.red.shade300,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: Colors.red.shade600,
+                        ),
+                        label: Text(
+                          'Reject',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.red.shade600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _approveApplication(app);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F7253),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.check_circle_outline,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Approve',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+// ============================================================
 // EMPTY STATE
 // ============================================================
 
@@ -1210,9 +1867,11 @@ rider['status'] == 'Active';
 if (currentlyActive) {
 _showDeactivateConfirmation(rider);
 } else {
-setState(() {
-rider['status'] = 'Active';
-});
+_riderBloc.add(
+AdminRiderActivated(
+rider['id'].toString(),
+),
+);
 
 ScaffoldMessenger.of(context).showSnackBar(
 const SnackBar(
@@ -1258,10 +1917,11 @@ color: Colors.grey,
 ),
 TextButton(
 onPressed: () {
-setState(() {
-rider['status'] = 'Inactive';
-rider['online'] = false;
-});
+_riderBloc.add(
+AdminRiderDeactivated(
+rider['id'].toString(),
+),
+);
 
 Navigator.pop(ctx);
 
@@ -1418,22 +2078,19 @@ content: Text(
 return;
 }
 
-setState(() {
-_riders.add({
-'id':
-'RID-${1001 + _riders.length}',
-'name': name,
+_riderBloc.add(
+AdminRiderAdded({
+'fullName': name,
 'phone': phone,
 'email': email,
-'status': 'Active',
+'active': true,
 'online': false,
 'deliveries': 0,
 'currentOrder': null,
 'location':
 'Location unavailable',
-'lastSeen': 'Just added',
-});
-});
+}),
+);
 
 Navigator.pop(sheetContext);
 
@@ -1544,7 +2201,7 @@ final isDark =
 theme.brightness == Brightness.dark;
 
 final primaryColor = isDark
-? const Color(0xFF32C787)
+? const Color(0xFF0F7253)
     : const Color(0xFF0F7253);
 
 showModalBottomSheet(
@@ -1851,7 +2508,7 @@ final isDark =
 theme.brightness == Brightness.dark;
 
 final primaryColor = isDark
-? const Color(0xFF32C787)
+? const Color(0xFF0F7253)
     : const Color(0xFF0F7253);
 
 showModalBottomSheet(
@@ -1966,7 +2623,7 @@ height: 7,
 decoration:
 const BoxDecoration(
 color:
-Color(0xFF32C787),
+Color(0xFF0F7253),
 shape: BoxShape.circle,
 ),
 ),

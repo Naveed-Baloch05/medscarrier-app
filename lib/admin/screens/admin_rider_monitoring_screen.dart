@@ -1,4 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../bloc/admin_monitoring/admin_monitoring_bloc.dart';
+import '../../bloc/admin_monitoring/admin_monitoring_event.dart';
+import '../../bloc/admin_monitoring/admin_monitoring_state.dart';
 
 class AdminRiderMonitoringScreen extends StatefulWidget {
   const AdminRiderMonitoringScreen({super.key});
@@ -8,41 +14,103 @@ class AdminRiderMonitoringScreen extends StatefulWidget {
 }
 
 class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen> {
-  final List<Map<String, dynamic>> _riders = [
-    {
-      'id': 'RID-1001',
-      'name': 'Naveed Baloch',
-      'online': true,
-      'deliveries': 24,
-      'currentOrder': '#MC-4818',
-      'location': 'Camden High St',
-      'lastSeen': 'Live now',
-      'deliveryStatus': 'On the way',
-    },
-    {
-      'id': 'RID-1002',
-      'name': 'Ali Ahmed',
-      'online': false,
-      'deliveries': 18,
-      'currentOrder': null,
-      'location': 'Islington Road',
-      'lastSeen': '8 min ago',
-      'deliveryStatus': 'Idle',
-    },
-    {
-      'id': 'RID-1003',
-      'name': 'Usman Khan',
-      'online': true,
-      'deliveries': 9,
-      'currentOrder': '#MC-4820',
-      'location': 'Hackney',
-      'lastSeen': 'Live now',
-      'deliveryStatus': 'Picking up',
-    },
-  ];
+  late final AdminMonitoringBloc _bloc;
+
+  @override
+  void initState() {
+    super.initState();
+    _bloc = AdminMonitoringBloc();
+    _bloc.add(const AdminMonitoringStartRequested());
+  }
+
+  @override
+  void dispose() {
+    _bloc.add(const AdminMonitoringStopRequested());
+    _bloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider.value(
+      value: _bloc,
+      child: BlocBuilder<AdminMonitoringBloc, AdminMonitoringState>(
+        builder: (context, state) {
+          final rawRiders = state is AdminMonitoringActive ? state.riders : const <Map<String, dynamic>>[];
+          final riders = _mapRiders(rawRiders);
+
+          return _buildScaffold(riders);
+        },
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _mapRiders(List<Map<String, dynamic>> riders) {
+    return riders.map((rider) {
+      final online = rider['online'] == true;
+
+      return <String, dynamic>{
+        'id': rider['id'] ?? '',
+        'name': (rider['fullName'] ?? '').toString(),
+        'online': online,
+        'currentOrder': rider['currentOrder'],
+        'location': _formatLocation(rider['location']),
+        'lastSeen': _formatLastSeen(rider['lastSeen'], online),
+        'deliveryStatus':
+            (rider['deliveryStatus'] ?? '').toString().isNotEmpty
+                ? rider['deliveryStatus'].toString()
+                : 'Idle',
+      };
+    }).toList();
+  }
+
+  String _formatLocation(dynamic location) {
+    if (location is Map) {
+      final lat = (location['lat'] as num?)?.toDouble();
+      final lng = (location['lng'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        return '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+      }
+    }
+    return 'Location unavailable';
+  }
+
+  String _formatLastSeen(dynamic lastSeen, bool online) {
+    if (online) {
+      return 'Live now';
+    }
+
+    DateTime? time;
+
+    if (lastSeen is Timestamp) {
+      time = lastSeen.toDate();
+    } else if (lastSeen is DateTime) {
+      time = lastSeen;
+    } else if (lastSeen is String && lastSeen.trim().isNotEmpty) {
+      time = DateTime.tryParse(lastSeen);
+      if (time == null) {
+        return lastSeen;
+      }
+    }
+
+    if (time == null) {
+      return 'Unknown';
+    }
+
+    final difference = DateTime.now().difference(time);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hrs ago';
+    }
+
+    return '${difference.inDays} days ago';
+  }
+
+  Widget _buildScaffold(List<Map<String, dynamic>> riders) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final bgColor = isDark ? const Color(0xFF08100C) : const Color(0xFFF2F5F3);
@@ -52,8 +120,8 @@ class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen>
     final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
     final borderColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
 
-    final onlineCount = _riders.where((r) => r['online'] == true).length;
-    final deliveringCount = _riders.where((r) => r['currentOrder'] != null).length;
+    final onlineCount = riders.where((r) => r['online'] == true).length;
+    final deliveringCount = riders.where((r) => r['currentOrder'] != null).length;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -65,7 +133,10 @@ class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen>
         actions: [
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: textPrimary),
-            onPressed: () => setState(() {}),
+            onPressed: () {
+              _bloc.add(const AdminMonitoringStopRequested());
+              _bloc.add(const AdminMonitoringStartRequested());
+            },
           ),
         ],
       ),
@@ -74,7 +145,7 @@ class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen>
         children: [
           Row(
             children: [
-              _statCard('Total', '${_riders.length}', Icons.people_outline, primaryColor, cardColor, borderColor, textPrimary, textSecondary),
+              _statCard('Total', '${riders.length}', Icons.people_outline, primaryColor, cardColor, borderColor, textPrimary, textSecondary),
               const SizedBox(width: 8),
               _statCard('Online', '$onlineCount', Icons.wifi, primaryColor, cardColor, borderColor, textPrimary, textSecondary),
               const SizedBox(width: 8),
@@ -82,7 +153,7 @@ class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen>
             ],
           ),
           const SizedBox(height: 16),
-          ..._riders.map((rider) => _buildRiderCard(rider, cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark)),
+          ...riders.map((rider) => _buildRiderCard(rider, cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark)),
         ],
       ),
     );
@@ -144,7 +215,7 @@ class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen>
                       child: Container(
                         width: 12, height: 12,
                         decoration: BoxDecoration(
-                          color: hasOrder ? const Color(0xFFFFB74D) : const Color(0xFF32C787),
+                          color: hasOrder ? const Color(0xFFFFB74D) : const Color(0xFF0F7253),
                           shape: BoxShape.circle,
                           border: Border.all(color: cardColor, width: 2),
                         ),
@@ -165,7 +236,7 @@ class _AdminRiderMonitoringScreenState extends State<AdminRiderMonitoringScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: online ? (isDark ? const Color(0xFF15301D) : const Color(0xFFE8F5E9)) : Colors.grey.withValues(alpha: 0.12),
+                  color: online ? (isDark ? const Color(0xFF1D322A) : const Color(0xFFE8F5E9)) : Colors.grey.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

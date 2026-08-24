@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:medscarrier/bloc/admin_login/admin_login_bloc.dart';
 import 'package:medscarrier/widgets/home_content.dart';
 import 'package:medscarrier/screens/free_trial_screen.dart';
 import 'package:medscarrier/screens/signup_screen.dart';
@@ -292,7 +294,12 @@ void main() {
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+    await tester.pumpWidget(
+      BlocProvider(
+        create: (_) => AdminLoginBloc(),
+        child: const MaterialApp(home: SplashScreen()),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('MedScarrier'), findsOneWidget);
@@ -322,7 +329,12 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+      await tester.pumpWidget(
+        BlocProvider(
+          create: (_) => AdminLoginBloc(),
+          child: const MaterialApp(home: SplashScreen()),
+        ),
+      );
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(SplashScreen), findsOneWidget,

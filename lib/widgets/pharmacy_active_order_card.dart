@@ -73,7 +73,7 @@ class PharmacyActiveOrderCard extends StatelessWidget {
                       orderId,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: cs.primary,
+                        color: const Color(0xFF0F7253),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -228,7 +228,7 @@ class PharmacyActiveOrderCard extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: cs.primary,
+                    backgroundColor: const Color(0xFF0F7253),
                     foregroundColor: isDark
                         ? const Color(0xFF0C1310)
                         : Colors.white,
@@ -363,7 +363,7 @@ class PharmacyActiveOrderCard extends StatelessWidget {
       case PharmacyOrderStatusType.preparing:
       case PharmacyOrderStatusType.ready:
         return isDark
-            ? const Color(0xFF32C787)
+            ? const Color(0xFF0F7253)
             : const Color(0xFF0F7253);
       case PharmacyOrderStatusType.riderEnRoute:
       case PharmacyOrderStatusType.onTheWay:

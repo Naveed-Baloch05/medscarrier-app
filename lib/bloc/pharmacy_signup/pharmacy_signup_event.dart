@@ -1,3 +1,5 @@
+import 'dart:io';
+
 abstract class PharmacySignupEvent {
   const PharmacySignupEvent();
 }
@@ -10,7 +12,7 @@ class PharmacySignupSubmitted extends PharmacySignupEvent {
     required this.phone,
     required this.businessAddress,
     required this.gphcNumber,
-    required this.password,
+    this.licenseDocument,
   });
 
   final String pharmacyName;
@@ -19,7 +21,7 @@ class PharmacySignupSubmitted extends PharmacySignupEvent {
   final String phone;
   final String businessAddress;
   final String gphcNumber;
-  final String password;
+  final File? licenseDocument;
 }
 
 class PharmacySignupReset extends PharmacySignupEvent {

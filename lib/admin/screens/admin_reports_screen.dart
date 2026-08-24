@@ -1,4 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../bloc/admin_dashboard/admin_dashboard_bloc.dart';
+import '../../bloc/admin_dashboard/admin_dashboard_event.dart';
+import '../../bloc/admin_dashboard/admin_dashboard_state.dart';
+import '../../bloc/admin_rider/admin_rider_bloc.dart';
+import '../../bloc/admin_rider/admin_rider_event.dart';
+import '../../bloc/admin_rider/admin_rider_state.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -8,9 +18,26 @@ class AdminReportsScreen extends StatefulWidget {
 }
 
 class _AdminReportsScreenState extends State<AdminReportsScreen> {
+  final AdminDashboardBloc _dashboardBloc = AdminDashboardBloc();
+  final AdminRiderBloc _riderBloc = AdminRiderBloc();
+
   String _selectedPeriod = 'This Week';
 
   final List<String> _periods = ['Today', 'This Week', 'All Time'];
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardBloc.add(const AdminDashboardLoadRequested());
+    _riderBloc.add(const AdminRiderLoadRequested());
+  }
+
+  @override
+  void dispose() {
+    _dashboardBloc.close();
+    _riderBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,39 +50,59 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
     final borderColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text('Reports', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textPrimary)),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, color: textPrimary),
-            onPressed: () => setState(() {}),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          _buildPeriodSelector(cardColor, primaryColor, borderColor, textPrimary, textSecondary, isDark),
-          const SizedBox(height: 18),
-          _buildMetricsGrid(cardColor, borderColor, primaryColor, textPrimary, textSecondary),
-          const SizedBox(height: 18),
-          _sectionTitle('Delivery Trend', textPrimary),
-          const SizedBox(height: 12),
-          _buildDeliveryTrend(cardColor, borderColor, primaryColor, textPrimary, textSecondary, isDark),
-          const SizedBox(height: 18),
-          _sectionTitle('Top Performing Riders', textPrimary),
-          const SizedBox(height: 12),
-          _buildTopRiders(cardColor, borderColor, primaryColor, textPrimary, textSecondary, isDark),
-          const SizedBox(height: 18),
-          _sectionTitle('Recent Activity', textPrimary),
-          const SizedBox(height: 12),
-          _buildRecentActivity(cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark),
-        ],
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AdminDashboardBloc>.value(value: _dashboardBloc),
+        BlocProvider<AdminRiderBloc>.value(value: _riderBloc),
+      ],
+      child: BlocBuilder<AdminDashboardBloc, AdminDashboardState>(
+        builder: (context, dashboardState) {
+          return BlocBuilder<AdminRiderBloc, AdminRiderState>(
+            builder: (context, riderState) {
+              final data =
+                  dashboardState is AdminDashboardLoaded ? dashboardState : null;
+
+              return Scaffold(
+                backgroundColor: bgColor,
+                appBar: AppBar(
+                  backgroundColor: bgColor,
+                  elevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                  title: Text('Reports', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textPrimary)),
+                  actions: [
+                    IconButton(
+                      icon: Icon(Icons.refresh_rounded, color: textPrimary),
+                      onPressed: () {
+                        _dashboardBloc.add(const AdminDashboardRefreshed());
+                        _riderBloc.add(const AdminRiderRefreshed());
+                      },
+                    ),
+                  ],
+                ),
+                body: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    _buildPeriodSelector(cardColor, primaryColor, borderColor, textPrimary, textSecondary, isDark),
+                    const SizedBox(height: 18),
+                    _buildMetricsGrid(cardColor, borderColor, primaryColor, textPrimary, textSecondary, data),
+                    const SizedBox(height: 18),
+                    _sectionTitle('Delivery Trend', textPrimary),
+                    const SizedBox(height: 12),
+                    _buildDeliveryTrend(cardColor, borderColor, primaryColor, textPrimary, textSecondary, isDark),
+                    const SizedBox(height: 18),
+                    _sectionTitle('Top Performing Riders', textPrimary),
+                    const SizedBox(height: 12),
+                    _buildTopRiders(cardColor, borderColor, primaryColor, textPrimary, textSecondary, isDark, riderState),
+                    const SizedBox(height: 18),
+                    _sectionTitle('Recent Activity', textPrimary),
+                    const SizedBox(height: 12),
+                    _buildRecentActivity(cardColor, borderColor, textPrimary, textSecondary, primaryColor, isDark),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -91,12 +138,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     );
   }
 
-  Widget _buildMetricsGrid(Color cardColor, Color borderColor, Color primaryColor, Color textPrimary, Color textSecondary) {
+  Widget _buildMetricsGrid(Color cardColor, Color borderColor, Color primaryColor, Color textPrimary, Color textSecondary, AdminDashboardLoaded? data) {
     final metrics = [
-      {'icon': Icons.local_shipping_outlined, 'label': 'Total Deliveries', 'value': '156'},
-      {'icon': Icons.access_time_filled_outlined, 'label': 'Avg Delivery Time', 'value': '18 min'},
-      {'icon': Icons.two_wheeler_outlined, 'label': 'Active Riders', 'value': '8'},
-      {'icon': Icons.storefront_outlined, 'label': 'Active Pharmacies', 'value': '12'},
+      {'icon': Icons.local_shipping_outlined, 'label': 'Total Deliveries', 'value': data?.completedOrders.toString() ?? '0'},
+      {'icon': Icons.access_time_filled_outlined, 'label': 'Avg Delivery Time', 'value': '${data?.avgDeliveryTime ?? 0} min'},
+      {'icon': Icons.two_wheeler_outlined, 'label': 'Active Riders', 'value': data?.onlineRiders.toString() ?? '0'},
+      {'icon': Icons.storefront_outlined, 'label': 'Active Pharmacies', 'value': data?.activePharmacies.toString() ?? '0'},
     ];
 
     return GridView.builder(
@@ -190,12 +237,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     );
   }
 
-  Widget _buildTopRiders(Color cardColor, Color borderColor, Color primaryColor, Color textPrimary, Color textSecondary, bool isDark) {
-    final riders = [
-      {'name': 'Tom Reilly', 'deliveries': 42, 'maxDeliveries': 50},
-      {'name': 'Maya Aslam', 'deliveries': 38, 'maxDeliveries': 50},
-      {'name': 'Naveed Baloch', 'deliveries': 24, 'maxDeliveries': 50},
-    ];
+  Widget _buildTopRiders(Color cardColor, Color borderColor, Color primaryColor, Color textPrimary, Color textSecondary, bool isDark, AdminRiderState riderState) {
+    final riders = _topRiders(riderState);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -243,6 +286,25 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         }).toList(),
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _topRiders(AdminRiderState riderState) {
+    if (riderState is! AdminRiderLoaded) return [];
+
+    final sorted = [...riderState.riders]..sort((a, b) {
+        final aDeliveries = (a['deliveries'] as num?)?.toInt() ?? 0;
+        final bDeliveries = (b['deliveries'] as num?)?.toInt() ?? 0;
+        return bDeliveries.compareTo(aDeliveries);
+      });
+
+    return sorted.take(3).map((rider) {
+      final deliveries = (rider['deliveries'] as num?)?.toInt() ?? 0;
+      return {
+        'name': (rider['fullName'] ?? '').toString(),
+        'deliveries': deliveries,
+        'maxDeliveries': max(50, deliveries),
+      };
+    }).toList();
   }
 
   Widget _buildRecentActivity(Color cardColor, Color borderColor, Color textPrimary, Color textSecondary, Color primaryColor, bool isDark) {

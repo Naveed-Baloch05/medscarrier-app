@@ -1,4 +1,4 @@
-import '../../models/rider_model.dart';
+import '../../models/rider_application_model.dart';
 
 abstract class RiderSignupState {
   const RiderSignupState();
@@ -13,9 +13,9 @@ class RiderSignupLoading extends RiderSignupState {
 }
 
 class RiderSignupSuccess extends RiderSignupState {
-  const RiderSignupSuccess(this.rider);
+  const RiderSignupSuccess(this.application);
 
-  final RiderModel rider;
+  final RiderApplicationModel application;
 }
 
 class RiderSignupFailure extends RiderSignupState {
