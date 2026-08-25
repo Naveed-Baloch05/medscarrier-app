@@ -17,17 +17,6 @@ class RiderSignupService {
   CollectionReference<Map<String, dynamic>> get _applications =>
       _firestore.collection('rider_applications');
 
-  Future<bool> emailExists(String email) async {
-    final normalizedEmail = email.trim().toLowerCase();
-
-    final appQuery = await _applications
-        .where('email', isEqualTo: normalizedEmail)
-        .limit(1)
-        .get();
-
-    return appQuery.docs.isNotEmpty;
-  }
-
   Future<RiderApplicationModel> register({
     required String fullName,
     required String email,
@@ -39,14 +28,9 @@ class RiderSignupService {
     File? drivingLicenceFront,
     File? drivingLicenceBack,
   }) async {
-    final duplicate = await emailExists(email);
-    if (duplicate) {
-      throw Exception(
-        'An application or account with this email already exists.',
-      );
-    }
-
     UserCredential credential;
+
+    // 1. Create Auth user
     try {
       credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
@@ -56,63 +40,71 @@ class RiderSignupService {
       if (e.code == 'email-already-in-use') {
         throw Exception('An account with this email already exists.');
       }
-      throw Exception('Failed to create account. Please try again.');
+      throw Exception(e.message ?? 'Failed to create account. Please try again.');
     }
 
     final uid = credential.user!.uid;
 
-    final appRef = _applications.doc();
-    final applicationId = appRef.id;
+    try {
+      // 2. Upload files while user IS authenticated
+      String? profilePhotoUrl;
+      String? licenceFrontUrl;
+      String? licenceBackUrl;
 
-    await appRef.set({
-      'applicationId': applicationId,
-      'uid': uid,
-      'fullName': fullName.trim(),
-      'email': email.trim().toLowerCase(),
-      'phone': phone.trim(),
-      'vehicleType': vehicleType,
-      'vehicleRegistrationNumber': vehicleReg.trim(),
-      'status': 'pending',
-      'submittedAt': FieldValue.serverTimestamp(),
-      'termsAccepted': true,
-      'rightToWorkConsent': true,
-      'backgroundCheckConsent': true,
-    });
+      if (profilePhoto != null) {
+        profilePhotoUrl = await _uploadFile(
+          path: 'rider_applications/$uid/profile_photo.jpg',
+          file: profilePhoto,
+        );
+      }
 
-    final Map<String, dynamic> updates = {};
+      if (drivingLicenceFront != null) {
+        licenceFrontUrl = await _uploadFile(
+          path: 'rider_applications/$uid/driving_licence_front.jpg',
+          file: drivingLicenceFront,
+        );
+      }
 
-    if (profilePhoto != null) {
-      final photoUrl = await _uploadFile(
-        path: 'rider_applications/$applicationId/profile_photo.jpg',
-        file: profilePhoto,
-      );
-      updates['profilePhotoUrl'] = photoUrl;
+      if (drivingLicenceBack != null) {
+        licenceBackUrl = await _uploadFile(
+          path: 'rider_applications/$uid/driving_licence_back.jpg',
+          file: drivingLicenceBack,
+        );
+      }
+
+      // 3. Prepare application data (Document ID and uid field MUST match)
+      final applicationData = <String, dynamic>{
+        'applicationId': uid,
+        'uid': uid,
+        'fullName': fullName.trim(),
+        'email': email.trim().toLowerCase(),
+        'phone': phone.trim(),
+        'vehicleType': vehicleType,
+        'vehicleRegistrationNumber': vehicleReg.trim(),
+        'profilePhotoUrl': profilePhotoUrl,
+        'drivingLicenceFrontUrl': licenceFrontUrl,
+        'drivingLicenceBackUrl': licenceBackUrl,
+        'status': 'pending',
+        'submittedAt': FieldValue.serverTimestamp(),
+        'termsAccepted': true,
+        'rightToWorkConsent': true,
+        'backgroundCheckConsent': true,
+      };
+
+      // 4. Save to Firestore under doc(uid) to satisfy security rules
+      final docRef = _applications.doc(uid);
+      await docRef.set(applicationData);
+
+      // 5. Read back document and sign out user
+      final docSnapshot = await docRef.get();
+      await _auth.signOut();
+
+      return RiderApplicationModel.fromFirestore(docSnapshot);
+    } catch (e) {
+      // Rollback: delete Auth user if document creation or file upload fails
+      await credential.user?.delete();
+      throw Exception('Registration failed: ${e.toString()}');
     }
-
-    if (drivingLicenceFront != null) {
-      final frontUrl = await _uploadFile(
-        path: 'rider_applications/$applicationId/driving_licence_front.jpg',
-        file: drivingLicenceFront,
-      );
-      updates['drivingLicenceFrontUrl'] = frontUrl;
-    }
-
-    if (drivingLicenceBack != null) {
-      final backUrl = await _uploadFile(
-        path: 'rider_applications/$applicationId/driving_licence_back.jpg',
-        file: drivingLicenceBack,
-      );
-      updates['drivingLicenceBackUrl'] = backUrl;
-    }
-
-    if (updates.isNotEmpty) {
-      await _applications.doc(applicationId).update(updates);
-    }
-
-    await _auth.signOut();
-
-    final updatedDoc = await _applications.doc(applicationId).get();
-    return RiderApplicationModel.fromFirestore(updatedDoc);
   }
 
   Future<String> _uploadFile({
@@ -120,10 +112,10 @@ class RiderSignupService {
     required File file,
   }) async {
     final ref = _storage.ref().child(path);
-    await ref.putFile(
+    final uploadTask = await ref.putFile(
       file,
       SettableMetadata(contentType: 'image/jpeg'),
     );
-    return ref.getDownloadURL();
+    return await uploadTask.ref.getDownloadURL();
   }
 }

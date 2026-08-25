@@ -278,7 +278,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-          const MaterialApp(home: Scaffold(body: RiderHomeScreen())));
+          const MaterialApp(home: Scaffold(body: RiderHomeScreen(riderId: 'test-rider'))));
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(find.byType(RiderHomeScreen), findsOneWidget,

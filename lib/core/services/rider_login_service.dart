@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/rider_model.dart';
 
+/// Set to `true` to skip Firebase login entirely during development.
+/// Set to `false` for real Firebase authentication.
+const bool kUseMockRiderLogin = true;
+
 class RiderLoginService {
   RiderLoginService._();
   static final RiderLoginService instance = RiderLoginService._();
@@ -14,6 +18,19 @@ class RiderLoginService {
     required String email,
     required String password,
   }) async {
+    if (kUseMockRiderLogin) {
+      return RiderModel(
+        id: 'mock-rider-001',
+        fullName: 'Dev Rider',
+        email: email.trim(),
+        phone: '07000000000',
+        vehicleType: 'Car',
+        vehicleReg: 'MOCK 1A',
+        active: true,
+        createdAt: DateTime.now(),
+      );
+    }
+
     final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,

@@ -63,7 +63,9 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                       ),
                     );
                     Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const RiderHomeScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => RiderHomeScreen(riderId: state.rider.id),
+                      ),
                     );
                   } else if (state is RiderLoginFailure) {
                     ScaffoldMessenger.of(context).showSnackBar(

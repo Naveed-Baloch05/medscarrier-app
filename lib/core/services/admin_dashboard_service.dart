@@ -69,7 +69,7 @@ class AdminDashboardService {
           .limit(10)
           .get();
       return snapshot.docs.map((doc) {
-        return OrderModel.fromJson({'id': doc.id, ...doc.data()});
+        return OrderModel.fromFirestore(doc);
       }).toList();
     } catch (e) {
       throw Exception('Failed to fetch ready orders: $e');
@@ -84,7 +84,7 @@ class AdminDashboardService {
           .limit(10)
           .get();
       return snapshot.docs.map((doc) {
-        return OrderModel.fromJson({'id': doc.id, ...doc.data()});
+        return OrderModel.fromFirestore(doc);
       }).toList();
     } catch (e) {
       throw Exception('Failed to fetch active orders: $e');
