@@ -10,6 +10,7 @@ class RiderLoginBloc extends Bloc<RiderLoginEvent, RiderLoginState> {
       : _service = service ?? RiderLoginService.instance,
         super(const RiderLoginInitial()) {
     on<RiderLoginSubmitted>(_onSubmitted);
+    on<RiderLoginReset>((_, emit) => emit(const RiderLoginInitial()));
   }
 
   final RiderLoginService _service;
@@ -29,7 +30,6 @@ class RiderLoginBloc extends Bloc<RiderLoginEvent, RiderLoginState> {
       emit(RiderLoginSuccess(rider));
     } on FirebaseAuthException catch (e) {
       String message;
-
       switch (e.code) {
         case 'user-not-found':
           message = 'No account found for this email.';
@@ -41,8 +41,7 @@ class RiderLoginBloc extends Bloc<RiderLoginEvent, RiderLoginState> {
           message = 'Invalid email address.';
           break;
         case 'user-disabled':
-          message =
-              'This account has been disabled. Please wait for admin approval or contact support.';
+          message = 'This account has been disabled. Please contact support.';
           break;
         case 'invalid-credential':
           message = 'Invalid email or password.';
@@ -53,7 +52,6 @@ class RiderLoginBloc extends Bloc<RiderLoginEvent, RiderLoginState> {
         default:
           message = 'Login failed. Please try again.';
       }
-
       emit(RiderLoginFailure(message));
     } catch (error) {
       emit(RiderLoginFailure(

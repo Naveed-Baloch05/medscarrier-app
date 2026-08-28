@@ -1,18 +1,15 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
 
 import '../../models/pharmacy_application_model.dart';
+import 'admin_notification_service.dart';
 
 class AdminPharmacyService {
   AdminPharmacyService._();
   static final AdminPharmacyService instance = AdminPharmacyService._();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  static const String _backendBaseUrl = 'http://10.0.2.2:3000';
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _pharmacies =>
       _firestore.collection('pharmacies');
@@ -27,12 +24,21 @@ class AdminPharmacyService {
   Future<List<Map<String, dynamic>>> getAllPharmacies() async {
     try {
       final snapshot =
-          await _pharmacies.orderBy('createdAt', descending: true).get();
-      return snapshot.docs.map((doc) {
+          await _pharmacies.get();
+      final list = snapshot.docs.map((doc) {
         return {'id': doc.id, ...doc.data()};
       }).toList();
-    } catch (e) {
-      throw Exception('Failed to fetch pharmacies: $e');
+      list.sort((a, b) {
+        final aDate = a['createdAt'];
+        final bDate = b['createdAt'];
+        if (aDate is Timestamp && bDate is Timestamp) {
+          return bDate.compareTo(aDate);
+        }
+        return 0;
+      });
+      return list;
+    } catch (_) {
+      return [];
     }
   }
 
@@ -74,10 +80,21 @@ class AdminPharmacyService {
   }
 
   Stream<List<Map<String, dynamic>>> pharmaciesStream() {
-    return _pharmacies.orderBy('createdAt', descending: true).snapshots().map(
-          (snapshot) => snapshot.docs.map((doc) {
-            return {'id': doc.id, ...doc.data()};
-          }).toList(),
+    return _pharmacies.snapshots().map(
+          (snapshot) {
+            final list = snapshot.docs.map((doc) {
+              return {'id': doc.id, ...doc.data()};
+            }).toList();
+            list.sort((a, b) {
+              final aDate = a['createdAt'];
+              final bDate = b['createdAt'];
+              if (aDate is Timestamp && bDate is Timestamp) {
+                return bDate.compareTo(aDate);
+              }
+              return 0;
+            });
+            return list;
+          },
         );
   }
 
@@ -101,42 +118,185 @@ class AdminPharmacyService {
   // NEW: Pending pharmacy applications
   // ──────────────────────────────────────────────────────────────
 
+  Stream<List<PharmacyApplicationModel>> streamPendingPharmacyApplications() {
+    return _pharmacyApplications
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs.map((doc) {
+        return PharmacyApplicationModel.fromFirestore(doc);
+      }).toList();
+
+      list.sort((a, b) {
+        final aDate = a.submittedAt ?? DateTime(2000);
+        final bDate = b.submittedAt ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
+
+      return list;
+    });
+  }
+
   Future<List<PharmacyApplicationModel>>
       getPendingPharmacyApplications() async {
     try {
       final snapshot = await _pharmacyApplications
           .where('status', isEqualTo: 'pending')
-          .orderBy('submittedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) {
+      final list = snapshot.docs.map((doc) {
         return PharmacyApplicationModel.fromFirestore(doc);
       }).toList();
-    } catch (e) {
-      throw Exception('Failed to fetch pharmacy applications: $e');
+
+      list.sort((a, b) {
+        final aDate = a.submittedAt ?? DateTime(2000);
+        final bDate = b.submittedAt ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
+
+      return list;
+    } catch (_) {
+      return [];
     }
   }
 
   Future<void> approvePharmacyApplication(String applicationId) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('Not authenticated.');
+    final adminUid = user?.uid ?? 'admin';
 
-    final idToken = await user.getIdToken();
+    final appDoc = await _pharmacyApplications.doc(applicationId).get();
+    if (!appDoc.exists) throw Exception('Application not found.');
 
-    final response = await http.post(
-      Uri.parse(
-        '$_backendBaseUrl/admin/pharmacy-applications/$applicationId/approve',
-      ),
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': 'application/json',
+    final data = appDoc.data()!;
+    final email = (data['email'] as String? ?? '').trim().toLowerCase();
+    final pharmacyName = data['pharmacyName'] as String? ?? 'Pharmacy';
+
+    String uid = (data['uid'] as String? ?? '').trim();
+    if (uid.isEmpty && email.isNotEmpty) {
+      final authUid = await _createAuthAndGetUid(email);
+      if (authUid != null && authUid.isNotEmpty) {
+        uid = authUid;
+      } else {
+        uid = applicationId;
+      }
+    } else if (uid.isEmpty) {
+      uid = applicationId;
+    }
+
+    final batch = _firestore.batch();
+
+    batch.update(_pharmacyApplications.doc(applicationId), {
+      'status': 'approved',
+      'accountCreated': true,
+      'approvedAt': FieldValue.serverTimestamp(),
+      'approvedBy': adminUid,
+      'uid': uid,
+    });
+
+    batch.set(
+      _pharmacies.doc(uid),
+      {
+        'id': uid,
+        'uid': uid,
+        'applicationId': applicationId,
+        'pharmacyName': data['pharmacyName'] ?? '',
+        'contactName': data['contactName'] ?? '',
+        'email': email,
+        'phone': data['phone'] ?? '',
+        'businessAddress': data['businessAddress'] ?? '',
+        'gphcNumber': data['gphcNumber'] ?? '',
+        'licenseDocumentUrl': data['licenseDocumentUrl'] ?? '',
+        'status': 'Approved',
+        'active': true,
+        'createdAt': data['submittedAt'] ?? FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       },
+      SetOptions(merge: true),
     );
 
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw Exception(body['error'] ?? 'Failed to approve application.');
+    batch.set(
+      _firestore.collection('users').doc(uid),
+      {
+        'id': uid,
+        'uid': uid,
+        'applicationId': applicationId,
+        'name': data['contactName'] ?? data['pharmacyName'] ?? '',
+        'email': email,
+        'phone': data['phone'] ?? '',
+        'role': 'pharmacy',
+        'accountStatus': 'active',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
+
+    if (email.isNotEmpty) {
+      await _sendPasswordResetEmail(email);
     }
+
+    try {
+      await AdminNotificationService.instance.createNotification(
+        title: 'Pharmacy Application Approved',
+        body: '$pharmacyName has been approved and a password setup link was sent to $email.',
+        type: 'pharmacy',
+        referenceId: applicationId,
+      );
+    } catch (_) {}
+  }
+
+  Future<String?> _createAuthAndGetUid(String email) async {
+    try {
+      final secondaryApp = await _getSecondaryApp();
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      final tempPassword = _generateTempPassword();
+      final cred = await secondaryAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: tempPassword,
+      );
+      final authUid = cred.user!.uid;
+      await secondaryAuth.signOut();
+      return authUid;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        return null;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _sendPasswordResetEmail(String email) async {
+    try {
+      final secondaryApp = await _getSecondaryApp();
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      await secondaryAuth.sendPasswordResetEmail(email: email);
+      await secondaryAuth.signOut();
+    } catch (_) {
+      try {
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      } catch (_) {}
+    }
+  }
+
+  Future<FirebaseApp> _getSecondaryApp() async {
+    try {
+      return Firebase.app('pharmacy-approval');
+    } catch (_) {
+      return Firebase.initializeApp(
+        name: 'pharmacy-approval',
+        options: Firebase.app().options,
+      );
+    }
+  }
+
+  String _generateTempPassword() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#';
+    final rng = DateTime.now().millisecondsSinceEpoch;
+    return List.generate(16, (i) => chars[(rng + i * 7) % chars.length]).join();
   }
 
   Future<void> rejectPharmacyApplication(
@@ -144,26 +304,27 @@ class AdminPharmacyService {
     String rejectionReason = '',
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('Not authenticated.');
+    final adminUid = user?.uid ?? 'admin';
 
-    final idToken = await user.getIdToken();
+    final appDoc = await _pharmacyApplications.doc(applicationId).get();
+    if (!appDoc.exists) throw Exception('Application not found.');
 
-    final response = await http.post(
-      Uri.parse(
-        '$_backendBaseUrl/admin/pharmacy-applications/$applicationId/reject',
-      ),
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        if (rejectionReason.isNotEmpty) 'rejectionReason': rejectionReason,
-      }),
-    );
+    final name = appDoc.data()?['pharmacyName'] as String? ?? 'Pharmacy';
 
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw Exception(body['error'] ?? 'Failed to reject application.');
-    }
+    await _pharmacyApplications.doc(applicationId).update({
+      'status': 'rejected',
+      'rejectedAt': FieldValue.serverTimestamp(),
+      'rejectedBy': adminUid,
+      if (rejectionReason.isNotEmpty) 'rejectionReason': rejectionReason,
+    });
+
+    try {
+      await AdminNotificationService.instance.createNotification(
+        title: 'Pharmacy Application Rejected',
+        body: '$name application was rejected.',
+        type: 'pharmacy',
+        referenceId: applicationId,
+      );
+    } catch (_) {}
   }
 }

@@ -23,15 +23,19 @@ class PharmacyOrdersBloc
 
   String _currentSearch = '';
   String _currentStatus = 'All';
+  String _pharmacyId = '';
 
   Future<void> _onLoaded(
     LoadPharmacyOrders event,
     Emitter<PharmacyOrdersState> emit,
   ) async {
+    if (event.pharmacyId.isNotEmpty) {
+      _pharmacyId = event.pharmacyId;
+    }
     emit(const PharmacyOrdersLoading());
 
     try {
-      final allOrders = await _service.getOrders();
+      final allOrders = await _service.getOrders(_pharmacyId);
       final filtered = _applyFilters(allOrders, '', 'All');
 
       emit(PharmacyOrdersLoaded(
@@ -53,7 +57,7 @@ class PharmacyOrdersBloc
     emit(const PharmacyOrdersLoading());
 
     try {
-      final allOrders = await _service.getOrders();
+      final allOrders = await _service.getOrders(_pharmacyId);
       final filtered = _applyFilters(
         allOrders,
         _currentSearch,
@@ -122,13 +126,14 @@ class PharmacyOrdersBloc
   ) async {
     try {
       await _service.addOrder(
+        pharmacyId: _pharmacyId,
         customerName: event.customerName,
         medicineCount: event.medicineCount,
         status: event.status,
         totalAmount: event.totalAmount,
       );
 
-      final allOrders = await _service.getOrders();
+      final allOrders = await _service.getOrders(_pharmacyId);
       final filtered = _applyFilters(
         allOrders,
         _currentSearch,
@@ -160,7 +165,7 @@ class PharmacyOrdersBloc
         totalAmount: event.totalAmount,
       );
 
-      final allOrders = await _service.getOrders();
+      final allOrders = await _service.getOrders(_pharmacyId);
       final filtered = _applyFilters(
         allOrders,
         _currentSearch,
@@ -186,7 +191,7 @@ class PharmacyOrdersBloc
     try {
       await _service.deleteOrder(event.id);
 
-      final allOrders = await _service.getOrders();
+      final allOrders = await _service.getOrders(_pharmacyId);
       final filtered = _applyFilters(
         allOrders,
         _currentSearch,
@@ -217,7 +222,7 @@ class PharmacyOrdersBloc
         riderPhone: event.riderPhone,
       );
 
-      final allOrders = await _service.getOrders();
+      final allOrders = await _service.getOrders(_pharmacyId);
       final filtered = _applyFilters(
         allOrders,
         _currentSearch,

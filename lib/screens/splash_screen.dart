@@ -13,10 +13,12 @@ import '../admin/screens/admin_dashboard_screen.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
-  static const Color primaryTeal = Color(0xFF00968A);
-  static const Color darkTeal = Color(0xFF0D534D);
-  static const Color lightMint = Color(0xFFE6F5F3);
-  static const Color backgroundWhite = Color(0xFFFAFCFC);
+  static const Color primaryGreen = Color(0xFF0F7253);
+  static const Color darkGreen = Color(0xFF0F7253);
+  static const Color darkAccentGreen = Color(0xFF32C787);
+  static const Color lightMint = Color(0xFFE6F5ED);
+  static const Color backgroundWhite = Color(0xFFF2F5F3);
+  static const Color backgroundDark = Color(0xFF0C1310);
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -54,9 +56,12 @@ class _SplashScreenState extends State<SplashScreen>
     // Check if admin is already signed in (keep-me-signed-in)
     // --------------------------------------------------------
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdminLoginBloc>().add(
-            const AdminLoginLoadRequested(),
-          );
+      if (!mounted) return;
+      try {
+        context.read<AdminLoginBloc>().add(
+              const AdminLoginLoadRequested(),
+            );
+      } catch (_) {}
     });
   }
 
@@ -116,7 +121,7 @@ class _SplashScreenState extends State<SplashScreen>
         builder: (context, state) {
           return Scaffold(
             backgroundColor:
-                isDark ? const Color(0xFF0A1312) : SplashScreen.backgroundWhite,
+                isDark ? SplashScreen.backgroundDark : SplashScreen.backgroundWhite,
             body: Stack(
               children: [
                 _buildBackgroundCircles(screenSize, isDark),
@@ -188,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen>
             width: screenSize.width * 0.55,
             height: screenSize.width * 0.55,
             decoration: BoxDecoration(
-              color: SplashScreen.primaryTeal.withValues(
+              color: SplashScreen.primaryGreen.withValues(
                 alpha: isDark ? 0.08 : 0.12,
               ),
               shape: BoxShape.circle,
@@ -202,7 +207,7 @@ class _SplashScreenState extends State<SplashScreen>
             width: screenSize.width * 0.45,
             height: screenSize.width * 0.45,
             decoration: BoxDecoration(
-              color: SplashScreen.primaryTeal.withValues(
+              color: SplashScreen.primaryGreen.withValues(
                 alpha: isDark ? 0.05 : 0.08,
               ),
               shape: BoxShape.circle,
@@ -232,7 +237,7 @@ class _SplashScreenState extends State<SplashScreen>
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : SplashScreen.darkTeal,
+            color: isDark ? Colors.white : SplashScreen.darkGreen,
             letterSpacing: -0.5,
           ),
         ),
@@ -243,20 +248,20 @@ class _SplashScreenState extends State<SplashScreen>
             Container(
               width: 32,
               height: 1.5,
-              color: SplashScreen.primaryTeal.withValues(alpha: 0.3),
+              color: SplashScreen.primaryGreen.withValues(alpha: 0.3),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 6.0),
               child: Icon(
                 Icons.show_chart_rounded,
                 size: 20,
-                color: SplashScreen.primaryTeal,
+                color: SplashScreen.primaryGreen,
               ),
             ),
             Container(
               width: 32,
               height: 1.5,
-              color: SplashScreen.primaryTeal.withValues(alpha: 0.3),
+              color: SplashScreen.primaryGreen.withValues(alpha: 0.3),
             ),
           ],
         ),
@@ -272,8 +277,8 @@ class _SplashScreenState extends State<SplashScreen>
         borderRadius: BorderRadius.circular(10),
         child: const LinearProgressIndicator(
           value: 1.0,
-          backgroundColor: Color(0xFFE2E8E8),
-          valueColor: AlwaysStoppedAnimation<Color>(SplashScreen.primaryTeal),
+          backgroundColor: Color(0xFFE2E8E5),
+          valueColor: AlwaysStoppedAnimation<Color>(SplashScreen.primaryGreen),
         ),
       ),
     );
@@ -283,7 +288,7 @@ class _SplashScreenState extends State<SplashScreen>
     return Icon(
       Icons.add_rounded,
       size: size,
-      color: SplashScreen.primaryTeal.withValues(alpha: opacity),
+      color: SplashScreen.primaryGreen.withValues(alpha: opacity),
     );
   }
 
@@ -291,7 +296,7 @@ class _SplashScreenState extends State<SplashScreen>
     return const Icon(
       Icons.health_and_safety_rounded,
       size: 64,
-      color: SplashScreen.primaryTeal,
+      color: SplashScreen.primaryGreen,
     );
   }
 
@@ -305,7 +310,7 @@ class _SplashScreenState extends State<SplashScreen>
         child: Icon(
           Icons.delivery_dining_rounded,
           size: 100,
-          color: SplashScreen.primaryTeal,
+          color: SplashScreen.primaryGreen,
         ),
       ),
     );

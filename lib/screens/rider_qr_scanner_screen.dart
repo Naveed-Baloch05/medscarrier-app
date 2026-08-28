@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class RiderQrScannerScreen extends StatefulWidget {
-  final Map<String, dynamic> delivery;
+  final String orderId;
 
   const RiderQrScannerScreen({
     super.key,
-    required this.delivery,
+    required this.orderId,
   });
 
   @override
@@ -147,9 +147,7 @@ class _RiderQrScannerScreenState extends State<RiderQrScannerScreen> {
 
   Widget _buildTopBar(BuildContext context) {
     final String deliveryId =
-        widget.delivery['id']?.toString() ??
-            widget.delivery['orderId']?.toString() ??
-            '#MC-0000';
+        widget.orderId.isNotEmpty ? '#${widget.orderId}' : '#MC-0000';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(

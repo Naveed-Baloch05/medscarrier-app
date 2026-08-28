@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/medicine_model.dart';
+
 class PharmacyMedicineCard extends StatelessWidget {
   const PharmacyMedicineCard({
     super.key,
@@ -7,7 +9,7 @@ class PharmacyMedicineCard extends StatelessWidget {
     required this.onOptionsTap,
   });
 
-  final Map<String, dynamic> medicine;
+  final MedicineModel medicine;
   final VoidCallback onOptionsTap;
 
   @override
@@ -16,9 +18,7 @@ class PharmacyMedicineCard extends StatelessWidget {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final int stock = medicine['stock'] as int;
-    final int threshold = (medicine['lowStockThreshold'] as int?) ?? 10;
-    final bool lowStock = stock <= threshold;
+    final bool lowStock = medicine.isLowStock;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -53,7 +53,7 @@ class PharmacyMedicineCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      medicine['name'],
+                      medicine.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -64,7 +64,7 @@ class PharmacyMedicineCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      medicine['genericName'],
+                      medicine.genericName,
                       style: TextStyle(
                         fontSize: 12,
                         color: cs.onSurfaceVariant,
@@ -73,8 +73,8 @@ class PharmacyMedicineCard extends StatelessWidget {
                     const SizedBox(height: 7),
                     Row(
                       children: [
-                        _tag(context, medicine['category']),
-                        if (medicine['prescription'] == true) ...[
+                        _tag(context, medicine.category),
+                        if (medicine.prescription) ...[
                           const SizedBox(width: 6),
                           _tag(context, 'Rx'),
                         ],
@@ -110,7 +110,7 @@ class PharmacyMedicineCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Stock: $stock',
+                      'Stock: ${medicine.stock}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -121,7 +121,7 @@ class PharmacyMedicineCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '£${(medicine['price'] as num).toStringAsFixed(2)}',
+                '\u00A3${medicine.price.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -144,7 +144,7 @@ class PharmacyMedicineCard extends StatelessWidget {
                   Icon(Icons.warning_amber_rounded, size: 17, color: Colors.red.shade600),
                   const SizedBox(width: 7),
                   Text(
-                    'Low stock — threshold: $threshold',
+                    'Low stock — threshold: ${medicine.lowStockThreshold}',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,

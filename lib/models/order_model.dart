@@ -77,6 +77,18 @@ class OrderModel {
     );
   }
 
+  OrderModel.noOp()
+      : this(
+          id: '',
+          pharmacyId: '',
+          pharmacyName: '',
+          customerName: '',
+          customerPhone: '',
+          pickupAddress: '',
+          dropoffAddress: '',
+          status: '',
+        );
+
   static DateTime? _parseTimestamp(dynamic value) {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;

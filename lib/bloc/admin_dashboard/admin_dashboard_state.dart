@@ -1,5 +1,6 @@
 import '../../models/pharmacy_model.dart';
 import '../../models/order_model.dart';
+import '../../models/rider_application_model.dart';
 
 abstract class AdminDashboardState {
   const AdminDashboardState();
@@ -25,7 +26,9 @@ class AdminDashboardLoaded extends AdminDashboardState {
     required this.totalPharmacies,
     required this.pendingPharmacies,
     required this.activePharmacies,
+    this.pendingRiders = 0,
     required this.pendingPharmacyList,
+    this.pendingRiderList = const [],
     required this.readyOrderList,
     required this.activeOrderList,
   });
@@ -40,9 +43,47 @@ class AdminDashboardLoaded extends AdminDashboardState {
   final int totalPharmacies;
   final int pendingPharmacies;
   final int activePharmacies;
+  final int pendingRiders;
   final List<PharmacyModel> pendingPharmacyList;
+  final List<RiderApplicationModel> pendingRiderList;
   final List<OrderModel> readyOrderList;
   final List<OrderModel> activeOrderList;
+
+  AdminDashboardLoaded copyWith({
+    int? totalOrders,
+    int? activeOrders,
+    int? completedOrders,
+    int? avgDeliveryTime,
+    int? totalRiders,
+    int? onlineRiders,
+    int? activeRiders,
+    int? totalPharmacies,
+    int? pendingPharmacies,
+    int? activePharmacies,
+    int? pendingRiders,
+    List<PharmacyModel>? pendingPharmacyList,
+    List<RiderApplicationModel>? pendingRiderList,
+    List<OrderModel>? readyOrderList,
+    List<OrderModel>? activeOrderList,
+  }) {
+    return AdminDashboardLoaded(
+      totalOrders: totalOrders ?? this.totalOrders,
+      activeOrders: activeOrders ?? this.activeOrders,
+      completedOrders: completedOrders ?? this.completedOrders,
+      avgDeliveryTime: avgDeliveryTime ?? this.avgDeliveryTime,
+      totalRiders: totalRiders ?? this.totalRiders,
+      onlineRiders: onlineRiders ?? this.onlineRiders,
+      activeRiders: activeRiders ?? this.activeRiders,
+      totalPharmacies: totalPharmacies ?? this.totalPharmacies,
+      pendingPharmacies: pendingPharmacies ?? this.pendingPharmacies,
+      activePharmacies: activePharmacies ?? this.activePharmacies,
+      pendingRiders: pendingRiders ?? this.pendingRiders,
+      pendingPharmacyList: pendingPharmacyList ?? this.pendingPharmacyList,
+      pendingRiderList: pendingRiderList ?? this.pendingRiderList,
+      readyOrderList: readyOrderList ?? this.readyOrderList,
+      activeOrderList: activeOrderList ?? this.activeOrderList,
+    );
+  }
 }
 
 class AdminDashboardError extends AdminDashboardState {

@@ -6,6 +6,9 @@ import '../../bloc/admin_dashboard/admin_dashboard_state.dart';
 import '../../bloc/admin_notification/admin_notification_bloc.dart';
 import '../../bloc/admin_notification/admin_notification_event.dart';
 import '../../bloc/admin_notification/admin_notification_state.dart';
+import '../../models/pharmacy_model.dart';
+import '../../models/rider_application_model.dart';
+import '../../widgets/document_preview_dialog.dart';
 import 'admin_notifications_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_rider_management_screen.dart';
@@ -55,29 +58,58 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ? Colors.white.withValues(alpha: 0.05)
         : Colors.black.withValues(alpha: 0.04);
 
-    return BlocProvider<AdminDashboardBloc>.value(
-      value: _dashboardBloc,
-      child: Scaffold(
-        backgroundColor: bgColor,
-        body: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                  child: SizedBox(
-                    height: 40,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AdminDashboardBloc>.value(value: _dashboardBloc),
+        BlocProvider<AdminNotificationBloc>.value(value: _notificationBloc),
+      ],
+      child: BlocListener<AdminDashboardBloc, AdminDashboardState>(
+        listener: (context, state) {
+          if (state is AdminDashboardActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: const Color(0xFF0F7253),
+              ),
+            );
+          } else if (state is AdminDashboardError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+          }
+        },
+        child: Scaffold(
+          backgroundColor: bgColor,
+          body: SafeArea(
+            child: RefreshIndicator(
+              color: primaryColor,
+              onRefresh: () async {
+                _dashboardBloc.add(const AdminDashboardRefreshed());
+                _notificationBloc.add(const AdminNotificationLoadRequested());
+                await Future.delayed(const Duration(milliseconds: 600));
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                      child: SizedBox(
+                        height: 40,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
                             child: Image.asset(
                               'assets/images/logo.png',
                               fit: BoxFit.cover,
@@ -387,23 +419,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           for (int i = 0; i < pendingList.length; i++) ...[
                             if (i == 0)
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: cardBgColor,
                                   borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFF0F7253).withValues(alpha: 0.2),
+                                  ),
                                 ),
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
                                         Container(
-                                          width: 40,
-                                          height: 40,
+                                          width: 42,
+                                          height: 42,
                                           decoration: BoxDecoration(
                                             color: primaryColor.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
-                                          child: Icon(Icons.store, color: primaryColor, size: 20),
+                                          child: Icon(Icons.store, color: primaryColor, size: 22),
                                         ),
                                         const SizedBox(width: 10),
                                         Expanded(
@@ -411,7 +447,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(pendingList[i].pharmacyName,
-                                                  style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 14)),
+                                                  style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 15)),
                                               const SizedBox(height: 2),
                                               Text('GPhC \u2022 ${pendingList[i].gphcNumber}', style: TextStyle(color: textSecondary, fontSize: 11)),
                                               Text(pendingList[i].businessAddress, style: TextStyle(color: textSecondary, fontSize: 11), overflow: TextOverflow.ellipsis),
@@ -420,6 +456,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         ),
                                         Text(_getTimeAgo(pendingList[i].createdAt), style: TextStyle(color: textSecondary, fontSize: 10)),
                                       ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    DocumentImageThumbnail(
+                                      title: 'GPhC License Document',
+                                      imageUrl: pendingList[i].licenseDocumentUrl,
+                                      height: 130,
                                     ),
                                     const SizedBox(height: 12),
                                     Row(
@@ -431,9 +473,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               foregroundColor: Colors.white,
                                               elevation: 0,
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
                                             ),
                                             onPressed: () {
-                                              _dashboardBloc.add(AdminDashboardApprovePharmacy(pendingList[i].id));
+                                              _showApprovePharmacyDialog(pendingList[i], primaryColor, isDark);
                                             },
                                             icon: const Icon(Icons.check, size: 16),
                                             label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -447,52 +490,267 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               side: BorderSide.none,
                                               foregroundColor: textPrimary,
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
                                             ),
                                             onPressed: () {
-                                              _dashboardBloc.add(AdminDashboardRejectPharmacy(pendingList[i].id));
+                                              _showRejectPharmacyDialog(pendingList[i], isDark);
                                             },
                                             icon: const Icon(Icons.close, size: 16),
                                             label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                           ),
                                         ),
                                       ],
-                                    )
+                                    ),
                                   ],
                                 ),
                               ),
                             if (i > 0)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: cardBgColor,
-                                    borderRadius: BorderRadius.circular(12),
+                                child: GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AdminPharmacyManagementScreen()),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: BoxDecoration(
-                                          color: primaryColor.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: cardBgColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: primaryColor.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(Icons.store, color: primaryColor, size: 18),
                                         ),
-                                        child: Icon(Icons.store, color: primaryColor, size: 18),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(pendingList[i].pharmacyName, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 13)),
-                                            Text(pendingList[i].businessAddress, style: TextStyle(color: textSecondary, fontSize: 11), overflow: TextOverflow.ellipsis),
-                                          ],
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(pendingList[i].pharmacyName, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 13)),
+                                              Text(pendingList[i].businessAddress, style: TextStyle(color: textSecondary, fontSize: 11), overflow: TextOverflow.ellipsis),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      Text('${_getTimeAgo(pendingList[i].createdAt)}  ', style: TextStyle(color: textSecondary, fontSize: 10)),
-                                      Icon(Icons.arrow_forward_ios, size: 12, color: textSecondary),
-                                    ],
+                                        Text('${_getTimeAgo(pendingList[i].createdAt)}  ', style: TextStyle(color: textSecondary, fontSize: 10)),
+                                        Icon(Icons.arrow_forward_ios, size: 12, color: textSecondary),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // RIDER APPROVALS SECTION
+              BlocBuilder<AdminDashboardBloc, AdminDashboardState>(
+                bloc: _dashboardBloc,
+                builder: (context, state) {
+                  final pendingRiderCount = state is AdminDashboardLoaded ? state.pendingRiders : 0;
+                  final pendingRiderList = state is AdminDashboardLoaded ? state.pendingRiderList : <RiderApplicationModel>[];
+
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionHeader(
+                            title: 'Rider approvals',
+                            badgeText: '$pendingRiderCount pending',
+                            badgeBg: const Color(0xFFFF9800).withValues(alpha: 0.15),
+                            badgeTextColor: const Color(0xFFE65100),
+                            actionText: 'See all',
+                            onActionTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AdminRiderManagementScreen()),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          if (pendingRiderList.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: cardBgColor,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Center(
+                                child: Text('No pending rider approvals', style: TextStyle(fontSize: 13, color: textSecondary)),
+                              ),
+                            ),
+
+                          for (int i = 0; i < pendingRiderList.length; i++) ...[
+                            if (i == 0)
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: cardBgColor,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 42,
+                                          height: 42,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFF9800).withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: const Icon(Icons.two_wheeler, color: Color(0xFFFF9800), size: 22),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(pendingRiderList[i].fullName,
+                                                  style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 15)),
+                                              const SizedBox(height: 2),
+                                              Text('${pendingRiderList[i].vehicleType} \u2022 ${pendingRiderList[i].vehicleRegistrationNumber}',
+                                                  style: TextStyle(color: textSecondary, fontSize: 11)),
+                                              Text('${pendingRiderList[i].phone} \u2022 ${pendingRiderList[i].email}',
+                                                  style: TextStyle(color: textSecondary, fontSize: 11), overflow: TextOverflow.ellipsis),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(_getTimeAgo(pendingRiderList[i].submittedAt), style: TextStyle(color: textSecondary, fontSize: 10)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // Driving licence front & back thumbnails side-by-side
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: DocumentImageThumbnail(
+                                            title: 'Licence Front',
+                                            imageUrl: pendingRiderList[i].drivingLicenceFrontUrl,
+                                            height: 100,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: DocumentImageThumbnail(
+                                            title: 'Licence Back',
+                                            imageUrl: pendingRiderList[i].drivingLicenceBackUrl,
+                                            height: 100,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              backgroundColor: isDark ? Colors.transparent : const Color(0xFFF0F0F0),
+                                              side: BorderSide.none,
+                                              foregroundColor: textPrimary,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
+                                            ),
+                                            onPressed: () {
+                                              _showRiderDetailsDialog(pendingRiderList[i], primaryColor, isDark);
+                                            },
+                                            child: const Text('View Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF0F7253),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
+                                            ),
+                                            onPressed: () {
+                                              _showApproveRiderDialog(pendingRiderList[i], primaryColor, isDark);
+                                            },
+                                            icon: const Icon(Icons.check, size: 16),
+                                            label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.red.withValues(alpha: 0.1),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          ),
+                                          onPressed: () {
+                                            _showRejectRiderDialog(pendingRiderList[i], isDark);
+                                          },
+                                          icon: Icon(Icons.close, size: 18, color: Colors.red.shade600),
+                                          tooltip: 'Reject',
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (i > 0)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AdminRiderManagementScreen()),
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: cardBgColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFF9800).withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.two_wheeler, color: Color(0xFFFF9800), size: 18),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(pendingRiderList[i].fullName, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 13)),
+                                              Text('${pendingRiderList[i].vehicleType} \u2022 ${pendingRiderList[i].vehicleRegistrationNumber}',
+                                                  style: TextStyle(color: textSecondary, fontSize: 11), overflow: TextOverflow.ellipsis),
+                                            ],
+                                          ),
+                                        ),
+                                        Text('${_getTimeAgo(pendingRiderList[i].submittedAt)}  ', style: TextStyle(color: textSecondary, fontSize: 10)),
+                                        Icon(Icons.arrow_forward_ios, size: 12, color: textSecondary),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -736,10 +994,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) {
@@ -777,8 +1035,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMetricCard(
     BuildContext context, {
@@ -1045,6 +1304,401 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Text(subtitle, style: TextStyle(fontSize: 11, color: textSecondary)),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showApprovePharmacyDialog(
+    PharmacyModel pharmacy,
+    Color primaryColor,
+    bool isDark,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF0E1A14) : Colors.white,
+        title: Text(
+          'Approve Pharmacy',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF191C1B),
+          ),
+        ),
+        content: Text(
+          'Approve ${pharmacy.pharmacyName}? This will activate their pharmacy account and send an email to ${pharmacy.email.isNotEmpty ? pharmacy.email : "their email"} with a link to create their password.',
+          style: TextStyle(
+            color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _dashboardBloc.add(AdminDashboardApprovePharmacy(pharmacy.id));
+            },
+            child: const Text('Approve & Send Email'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRejectPharmacyDialog(
+    PharmacyModel pharmacy,
+    bool isDark,
+  ) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF0E1A14) : Colors.white,
+        title: Text(
+          'Reject Pharmacy Application',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF191C1B),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to reject the application for ${pharmacy.pharmacyName}?',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: 'Reason for rejection (optional)',
+                hintStyle: TextStyle(
+                  color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+                  fontSize: 13,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _dashboardBloc.add(AdminDashboardRejectPharmacy(pharmacy.id));
+            },
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showApproveRiderDialog(
+    RiderApplicationModel rider,
+    Color primaryColor,
+    bool isDark,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF0E1A14) : Colors.white,
+        title: Text(
+          'Approve Rider',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF191C1B),
+          ),
+        ),
+        content: Text(
+          'Approve ${rider.fullName}? This will activate their rider account and send an email to ${rider.email.isNotEmpty ? rider.email : "their email"} with approval details.',
+          style: TextStyle(
+            color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F7253),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _dashboardBloc.add(AdminDashboardApproveRider(rider.id));
+            },
+            child: const Text('Approve & Send Email'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRejectRiderDialog(
+    RiderApplicationModel rider,
+    bool isDark,
+  ) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF0E1A14) : Colors.white,
+        title: Text(
+          'Reject Rider Application',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF191C1B),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to reject the application for ${rider.fullName}?',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: 'Reason for rejection (optional)',
+                hintStyle: TextStyle(
+                  color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+                  fontSize: 13,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _dashboardBloc.add(
+                AdminDashboardRejectRider(
+                  rider.id,
+                  reason: reasonController.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRiderDetailsDialog(
+    RiderApplicationModel rider,
+    Color primaryColor,
+    bool isDark,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF0E1A14) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (_, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    rider.fullName,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF191C1B),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            _buildDialogDetail('Email', rider.email, isDark),
+            _buildDialogDetail('Phone', rider.phone, isDark),
+            _buildDialogDetail('Vehicle Type', rider.vehicleType, isDark),
+            _buildDialogDetail('Vehicle Reg', rider.vehicleRegistrationNumber, isDark),
+            _buildDialogDetail(
+              'Submitted',
+              rider.submittedAt != null
+                  ? '${rider.submittedAt!.day}/${rider.submittedAt!.month}/${rider.submittedAt!.year}'
+                  : 'Unknown',
+              isDark,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Driving Licence Documents',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF191C1B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: DocumentImageThumbnail(
+                    title: 'Licence Front',
+                    imageUrl: rider.drivingLicenceFrontUrl,
+                    height: 120,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DocumentImageThumbnail(
+                    title: 'Licence Back',
+                    imageUrl: rider.drivingLicenceBackUrl,
+                    height: 120,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F7253),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showApproveRiderDialog(rider, primaryColor, isDark);
+                    },
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Approve Application', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade600,
+                      side: BorderSide(color: Colors.red.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showRejectRiderDialog(rider, isDark);
+                    },
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Reject Application', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogDetail(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF191C1B),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

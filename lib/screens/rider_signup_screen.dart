@@ -17,13 +17,12 @@ class RiderSignupScreen extends StatefulWidget {
 }
 
 class _RiderSignupScreenState extends State<RiderSignupScreen> {
-  String _selectedVehicle = 'Bike';
   bool _agreeToTerms = false;
   bool _obscurePassword = true;
 
-  File? _profilePhoto;
-  File? _drivingLicenceFront;
-  File? _drivingLicenceBack;
+  String _selectedVehicle = 'Bike';
+  File? _licenseFront;
+  File? _licenseBack;
 
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
@@ -42,6 +41,13 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     _vehicleRegController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  String? _validateRequired(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName is required';
+    }
+    return null;
   }
 
   String? _validateEmail(String? value) {
@@ -78,10 +84,10 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
       return;
     }
 
-    if (_drivingLicenceFront == null || _drivingLicenceBack == null) {
+    if (_licenseFront == null || _licenseBack == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please upload both front and back of your driving licence'),
+          content: Text('Please upload both the front and back of your driving licence'),
           backgroundColor: Colors.red,
         ),
       );
@@ -95,52 +101,12 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
           vehicleType: _selectedVehicle,
           vehicleReg: _vehicleRegController.text.trim(),
           password: _passwordController.text,
-          profilePhoto: _profilePhoto,
-          drivingLicenceFront: _drivingLicenceFront,
-          drivingLicenceBack: _drivingLicenceBack,
+          licenseFront: _licenseFront,
+          licenseBack: _licenseBack,
         ));
   }
 
-  Future<void> _pickProfilePhoto() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded),
-                title: const Text('Take a photo'),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('Choose from gallery'),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (source == null) return;
-
-    final XFile? picked = await _picker.pickImage(
-      source: source,
-      maxWidth: 800,
-      maxHeight: 800,
-      imageQuality: 85,
-    );
-
-    if (picked != null) {
-      setState(() => _profilePhoto = File(picked.path));
-    }
-  }
-
-  Future<void> _pickDrivingLicence({required bool isFront}) async {
+  Future<void> _pickLicenseDocument({required bool isFront}) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -177,9 +143,9 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     if (picked != null) {
       setState(() {
         if (isFront) {
-          _drivingLicenceFront = File(picked.path);
+          _licenseFront = File(picked.path);
         } else {
-          _drivingLicenceBack = File(picked.path);
+          _licenseBack = File(picked.path);
         }
       });
     }
@@ -198,13 +164,12 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
           onPrimary: Colors.white,
           secondary: const Color(0xFF0F7253),
           onSecondary: Colors.white,
+          error: const Color(0xFFBA1A1A),
+          onError: Colors.white,
           surface: isDark ? const Color(0xFF151E1A) : const Color(0xFFFFFFFF),
           onSurface: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
           onSurfaceVariant:
               isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
-          outline: isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
-          error: const Color(0xFFBA1A1A),
-          onError: Colors.white,
         ),
         scaffoldBackgroundColor:
             isDark ? const Color(0xFF0B120E) : const Color(0xFFF2F5F3),
@@ -215,22 +180,20 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     final scale = _scale(context);
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 600;
+    final parentIsDark = Theme.of(context).brightness == Brightness.dark;
 
-    return BlocProvider(
-      create: (_) => RiderSignupBloc(),
+    return Theme(
+      data: scaledTheme(isDark: parentIsDark),
       child: Builder(
         builder: (context) {
           final theme = Theme.of(context);
+          final cs = theme.colorScheme;
           final isDark = theme.brightness == Brightness.dark;
 
-          return Theme(
-            data: scaledTheme(isDark: isDark),
+          return BlocProvider(
+            create: (_) => RiderSignupBloc(),
             child: Builder(
               builder: (context) {
-                final theme = Theme.of(context);
-                final cs = theme.colorScheme;
-                final isDark = theme.brightness == Brightness.dark;
-
                 return Scaffold(
                   backgroundColor: isDark
                       ? const Color(0xFF0C1310)
@@ -242,23 +205,104 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'Application submitted successfully. Your account is waiting for admin approval.',
+                                'Your request for approval sent successfully to admin.',
                               ),
                               backgroundColor: Color(0xFF0F7253),
                               duration: Duration(seconds: 4),
                             ),
                           );
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (_) => const RiderLoginScreen(),
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: isDark
+                                  ? const Color(0xFF151E1A)
+                                  : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0F7253)
+                                          .withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_circle_outline,
+                                      color: Color(0xFF0F7253),
+                                      size: 38,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Text(
+                                    'Approval Request Sent',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Your request for approval sent successfully to admin. Once approved, you will receive an email and can log into your account.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark
+                                          ? const Color(0xFF8B9B94)
+                                          : const Color(0xFF6E7A75),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF0F7253),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        Navigator.of(context)
+                                            .pushAndRemoveUntil(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const RiderLoginScreen(),
+                                          ),
+                                          (route) => route.isFirst,
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Back to Login',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            (route) => route.isFirst,
                           );
                         } else if (state is RiderSignupFailure) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(state.message),
-                              backgroundColor: Colors.red,
+                              backgroundColor: cs.error,
                             ),
                           );
                         }
@@ -270,7 +314,8 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                         ),
                         child: Center(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 480),
+                            constraints:
+                                const BoxConstraints(maxWidth: 480),
                             child: Form(
                               key: _formKey,
                               child: Column(
@@ -278,9 +323,22 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                 children: [
                                   _buildTopBar(context, cs, isDark),
 
-                                  SizedBox(height: 20 * scale),
+                                  SizedBox(height: 16 * scale),
 
-                                  _buildProfilePhotoPicker(scale, isDark, cs),
+                                  Container(
+                                    width: 60 * scale,
+                                    height: 60 * scale,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0F7253)
+                                          .withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.delivery_dining_rounded,
+                                      color: const Color(0xFF0F7253),
+                                      size: 30 * scale,
+                                    ),
+                                  ),
 
                                   SizedBox(height: 16 * scale),
 
@@ -291,16 +349,18 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                       fontSize: 26 * scale,
                                       fontWeight: FontWeight.w800,
                                       color: cs.onSurface,
+                                      height: 1.15,
                                       letterSpacing: -0.5,
                                     ),
                                   ),
-                                  SizedBox(height: 6 * scale),
+                                  SizedBox(height: 8 * scale),
                                   Text(
-                                    'Set up your account to start delivering.',
+                                    'Set up your account to start\ndelivering prescriptions.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: cs.onSurfaceVariant,
+                                      height: 1.3,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -312,10 +372,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                     hintText: 'Full name',
                                     icon: Icons.person_outline_rounded,
                                     isDark: isDark,
-                                    cs: cs,
-                                    validator: (v) => (v == null || v.trim().isEmpty)
-                                        ? 'Full name is required'
-                                        : null,
+                                    validator: (v) => _validateRequired(v, 'Full name'),
                                   ),
                                   SizedBox(height: 12 * scale),
                                   _buildCustomTextField(
@@ -324,7 +381,6 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                     icon: Icons.email_outlined,
                                     keyboardType: TextInputType.emailAddress,
                                     isDark: isDark,
-                                    cs: cs,
                                     validator: _validateEmail,
                                   ),
                                   SizedBox(height: 12 * scale),
@@ -334,68 +390,52 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                     icon: Icons.phone_outlined,
                                     keyboardType: TextInputType.phone,
                                     isDark: isDark,
-                                    cs: cs,
-                                    validator: (v) => (v == null || v.trim().isEmpty)
-                                        ? 'Phone number is required'
-                                        : null,
+                                    validator: (v) => _validateRequired(v, 'Phone number'),
                                   ),
 
                                   SizedBox(height: 20 * scale),
 
-                                  _buildVehicleTypeSelector(scale, isDark, cs),
+                                  _buildVehicleTypeSelector(scale, isDark),
 
                                   SizedBox(height: 12 * scale),
 
                                   _buildCustomTextField(
                                     controller: _vehicleRegController,
                                     hintText: 'Vehicle registration number',
-                                    icon: Icons.payment_rounded,
+                                    icon: Icons.directions_car_outlined,
                                     isDark: isDark,
-                                    cs: cs,
-                                    validator: (v) => (v == null || v.trim().isEmpty)
-                                        ? 'Vehicle registration is required'
-                                        : null,
+                                    validator: (v) => _validateRequired(v, 'Vehicle registration'),
                                   ),
 
                                   SizedBox(height: 20 * scale),
 
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'Driving licence',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: cs.onSurface,
-                                          ),
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.shield_outlined,
-                                              size: 14, color: Color(0xFF0F7253)),
-                                          const SizedBox(width: 4),
-                                          const Text(
-                                            'Reviewed by admin',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF0F7253),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                  _buildAdminReviewedField(
+                                    label: 'Driving licence — Front',
+                                    isDark: isDark,
+                                    child: _buildLicenceUploadCard(
+                                      file: _licenseFront,
+                                      isDark: isDark,
+                                      cs: cs,
+                                      label: 'Front of licence',
+                                      sublabel: 'Photo, max 10MB',
+                                      isFront: true,
+                                    ),
                                   ),
-                                  SizedBox(height: 10 * scale),
 
-                                  _buildUploadLicenceSection(isDark, cs, scale, isFront: true),
+                                  SizedBox(height: 12 * scale),
 
-                                  SizedBox(height: 10 * scale),
-
-                                  _buildUploadLicenceSection(isDark, cs, scale, isFront: false),
+                                  _buildAdminReviewedField(
+                                    label: 'Driving licence — Back',
+                                    isDark: isDark,
+                                    child: _buildLicenceUploadCard(
+                                      file: _licenseBack,
+                                      isDark: isDark,
+                                      cs: cs,
+                                      label: 'Back of licence',
+                                      sublabel: 'Photo, max 10MB',
+                                      isFront: false,
+                                    ),
+                                  ),
 
                                   SizedBox(height: 12 * scale),
 
@@ -405,33 +445,50 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                     icon: Icons.lock_outline_rounded,
                                     isPassword: true,
                                     isDark: isDark,
-                                    cs: cs,
                                     validator: _validatePassword,
+                                    suffixIcon: GestureDetector(
+                                      onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                                      child: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: isDark
+                                            ? const Color(0xFF6E9585)
+                                            : const Color(0xFF6E7A75),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    obscureText: _obscurePassword,
                                   ),
 
-                                  SizedBox(height: 16 * scale),
+                                  SizedBox(height: 12 * scale),
 
-                                  _buildTermsCheckbox(scale, cs),
+                                  _buildTermsCheckbox(scale, isDark, cs),
 
                                   SizedBox(height: 24 * scale),
 
-                                  BlocBuilder<RiderSignupBloc, RiderSignupState>(
+                                  BlocBuilder<RiderSignupBloc,
+                                      RiderSignupState>(
                                     builder: (context, state) {
                                       final isLoading =
                                           state is RiderSignupLoading;
                                       return InkWell(
-                                        onTap: isLoading ? null : () => _submit(context),
-                                        borderRadius: BorderRadius.circular(14),
+                                        onTap: isLoading
+                                            ? null
+                                            : () => _submit(context),
+                                        borderRadius:
+                                            BorderRadius.circular(14),
                                         child: Container(
                                           width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
+                                          padding: const EdgeInsets
+                                              .symmetric(vertical: 16),
                                           decoration: BoxDecoration(
                                             color: isLoading
                                                 ? (isDark
-                                                    ? const Color(0xFF1A3D2E)
-                                                    : const Color(0xFF8DCDB1))
+                                                    ? const Color(
+                                                        0xFF1A3D2E)
+                                                    : const Color(
+                                                        0xFF8DCDB1))
                                                 : const Color(0xFF0F7253),
                                             borderRadius:
                                                 BorderRadius.circular(14),
@@ -448,10 +505,10 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                                     ),
                                                   )
                                                 : Text(
-                                                    'Submit for review',
+                                                    'Submit for approval',
                                                     style: TextStyle(
-                                                      color: Colors.white,
                                                       fontSize: 16 * scale,
+                                                      color: Colors.white,
                                                       fontWeight:
                                                           FontWeight.w700,
                                                     ),
@@ -464,14 +521,13 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
 
                                   SizedBox(height: 16 * scale),
 
-                                  _buildVerificationCard(isDark),
+                                  _buildReviewNoticeCard(isDark),
 
-                                  SizedBox(height: 24 * scale),
+                                  SizedBox(height: 20 * scale),
 
                                   Wrap(
                                     alignment: WrapAlignment.center,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
                                       Text(
                                         'Already have an account? ',
@@ -549,72 +605,65 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     );
   }
 
-  Widget _buildProfilePhotoPicker(double scale, bool isDark, ColorScheme cs) {
-    return GestureDetector(
-      onTap: _pickProfilePhoto,
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              Container(
-                width: 84 * scale,
-                height: 84 * scale,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF151E1A)
-                      : Colors.white.withValues(alpha: 0.6),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF1D322A) : Colors.white,
-                    width: 2,
-                  ),
-                  image: _profilePhoto != null
-                      ? DecorationImage(
-                          image: FileImage(_profilePhoto!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: _profilePhoto == null
-                    ? Icon(
-                        Icons.person_outline_rounded,
-                        size: 42 * scale,
-                        color: isDark
-                            ? const Color(0xFF6E9585)
-                            : const Color(0xFF6E7A75),
-                      )
-                    : null,
+  Widget _buildAdminReviewedField({
+    required String label,
+    required Widget child,
+    required bool isDark,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color:
+                    isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
+                height: 1.2,
               ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0F7253),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt_rounded,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _profilePhoto == null ? 'Add a profile photo' : 'Change photo',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? const Color(0xFF8B9B94)
-                  : const Color(0xFF6E7A75),
             ),
-          ),
-        ],
-      ),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0F7253).withValues(alpha: 0.18)
+                    : const Color(0xFFE6F5ED),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.shield_outlined,
+                      size: 13,
+                      color: isDark
+                          ? const Color(0xFF32C787)
+                          : const Color(0xFF0F7253)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Reviewed by admin',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? const Color(0xFF32C787)
+                          : const Color(0xFF0F7253),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
     );
   }
 
@@ -623,17 +672,24 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     required String hintText,
     required IconData icon,
     required bool isDark,
-    required ColorScheme cs,
     bool isPassword = false,
+    bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    Widget? suffixIcon,
   }) {
+    final side = BorderSide(
+      color: isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
+    );
     return TextFormField(
       controller: controller,
-      obscureText: isPassword ? _obscurePassword : false,
+      obscureText: isPassword ? obscureText : false,
       keyboardType: keyboardType,
       validator: validator,
-      style: TextStyle(color: cs.onSurface, fontSize: 15),
+      style: TextStyle(
+        color: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
+        fontSize: 15,
+      ),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
@@ -646,22 +702,15 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
             const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color:
-                isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
-          ),
+          borderSide: side,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color:
-                isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
-          ),
+          borderSide: side,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFF0F7253), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF0F7253), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -677,26 +726,12 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
           color: isDark ? const Color(0xFF6E9585) : const Color(0xFF6E7A75),
           size: 22,
         ),
-        suffixIcon: isPassword
-            ? GestureDetector(
-                onTap: () => setState(() => _obscurePassword = !_obscurePassword),
-                child: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  color: isDark
-                      ? const Color(0xFF6E9585)
-                      : const Color(0xFF6E7A75),
-                  size: 22,
-                ),
-              )
-            : null,
+        suffixIcon: suffixIcon,
       ),
     );
   }
 
-  Widget _buildVehicleTypeSelector(
-      double scale, bool isDark, ColorScheme cs) {
+  Widget _buildVehicleTypeSelector(double scale, bool isDark) {
     final types = [
       {'name': 'Bike', 'icon': Icons.directions_bike_rounded},
       {'name': 'Car', 'icon': Icons.directions_car_rounded},
@@ -711,19 +746,17 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: cs.onSurface,
+            color: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
           ),
         ),
         SizedBox(height: 8 * scale),
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151E1A) : Colors.white,
+            color: isDark ? const Color(0xFF1A2520) : Colors.white,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isDark
-                  ? const Color(0xFF1D322A)
-                  : const Color(0xFFE2E8E5),
+              color: isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
             ),
           ),
           child: Row(
@@ -754,7 +787,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                               ? Colors.white
                               : (isDark
                                   ? const Color(0xFF8B9B94)
-                                  : const Color(0xFF6E7A75)),
+                                  : Colors.grey.shade600),
                         ),
                         SizedBox(height: 2 * scale),
                         Text(
@@ -766,7 +799,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                 ? Colors.white
                                 : (isDark
                                     ? const Color(0xFF8B9B94)
-                                    : const Color(0xFF6E7A75)),
+                                    : Colors.grey.shade700),
                           ),
                         ),
                       ],
@@ -781,141 +814,130 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     );
   }
 
-  Widget _buildUploadLicenceSection(
-      bool isDark, ColorScheme cs, double scale, {required bool isFront}) {
-    final hasFile = isFront ? _drivingLicenceFront != null : _drivingLicenceBack != null;
-    final label = isFront ? 'Front of licence' : 'Back of licence';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _pickDrivingLicence(isFront: isFront),
+  Widget _buildLicenceUploadCard({
+    required File? file,
+    required bool isDark,
+    required ColorScheme cs,
+    required String label,
+    required String sublabel,
+    required bool isFront,
+  }) {
+    return InkWell(
+      onTap: () => _pickLicenseDocument(isFront: isFront),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151E1A) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151E1A) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: hasFile
-                    ? const Color(0xFF0F7253)
-                    : (isDark
-                        ? const Color(0xFF1D322A)
-                        : const Color(0xFFE2E8E5)),
-                style: BorderStyle.solid,
-              ),
-            ),
-            child: hasFile
-                ? Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F7253).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.check_circle_rounded,
-                          color: Color(0xFF0F7253),
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${isFront ? "Front" : "Back"} uploaded',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Tap to change',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark
-                                    ? const Color(0xFF8B9B94)
-                                    : const Color(0xFF6E7A75),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: isDark
-                            ? const Color(0xFF8B9B94)
-                            : const Color(0xFF6E7A75),
-                        size: 22,
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF0F7253).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.file_upload_outlined,
-                          color: Color(0xFF0F7253),
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Upload ${isFront ? "front" : "back"}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Clear photo, max 10MB',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark
-                                    ? const Color(0xFF8B9B94)
-                                    : const Color(0xFF6E7A75),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+          border: Border.all(
+            color: file != null
+                ? const Color(0xFF0F7253)
+                : (isDark
+                    ? const Color(0xFF1D322A)
+                    : const Color(0xFFE2E8E5)),
           ),
         ),
-      ],
+        child: file != null
+            ? Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F7253).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF0F7253),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$label uploaded',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap to change',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFF8B9B94)
+                                : const Color(0xFF6E7A75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: isDark
+                        ? const Color(0xFF8B9B94)
+                        : const Color(0xFF6E7A75),
+                    size: 22,
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F7253).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.file_upload_outlined,
+                      color: isDark
+                          ? const Color(0xFF32C787)
+                          : const Color(0xFF0F7253),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          sublabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFF8B9B94)
+                                : const Color(0xFF6E7A75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 
-  Widget _buildTermsCheckbox(double scale, ColorScheme cs) {
+  Widget _buildTermsCheckbox(double scale, bool isDark, ColorScheme cs) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -926,6 +948,9 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
             value: _agreeToTerms,
             activeColor: const Color(0xFF0F7253),
             checkColor: Colors.white,
+            side: BorderSide(
+              color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
             ),
@@ -940,19 +965,20 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
             text: TextSpan(
               style: TextStyle(
                 fontSize: 12,
-                color: cs.onSurface,
+                color:
+                    isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
                 height: 1.4,
               ),
-              children: [
-                const TextSpan(text: 'I agree to the '),
-                const TextSpan(
+              children: const [
+                TextSpan(text: 'I agree to the '),
+                TextSpan(
                   text: 'Terms of Service',
                   style: TextStyle(
                     color: Color(0xFF0F7253),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const TextSpan(
+                TextSpan(
                   text:
                       ' and consent to a right-to-work and background check.',
                 ),
@@ -964,37 +990,36 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     );
   }
 
-  Widget _buildVerificationCard(bool isDark) {
+  Widget _buildReviewNoticeCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF151E1A)
-            : const Color(0xFFE6F5ED),
+        color: isDark ? const Color(0xFF151E1A) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF1D322A) : const Color(0xFF0F7253)
-              .withValues(alpha: 0.15),
-        ),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.access_time_rounded,
-            size: 18,
-            color:
-                isDark ? const Color(0xFF8B9B94) : const Color(0xFF0F7253),
-          ),
+          Icon(Icons.access_time_rounded,
+              size: 18,
+              color:
+                  isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75)),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              "We'll verify your documents before you can go online for deliveries.",
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? const Color(0xFF8B9B94)
-                    : const Color(0xFF191C1B),
-                fontWeight: FontWeight.w500,
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 12,
+                  color:
+                      isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+                  height: 1.3,
+                  fontWeight: FontWeight.w500,
+                ),
+                children: [
+                  const TextSpan(
+                    text:
+                        'Our team reviews new riders within 1 business day. Once approved, you\'ll receive an email with instructions to log in.',
+                  ),
+                ],
               ),
             ),
           ),

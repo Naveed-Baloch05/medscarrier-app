@@ -10,6 +10,7 @@ class PharmacyLoginBloc extends Bloc<PharmacyLoginEvent, PharmacyLoginState> {
       : _service = service ?? PharmacyLoginService.instance,
         super(const PharmacyLoginInitial()) {
     on<PharmacyLoginSubmitted>(_onSubmitted);
+    on<PharmacyLoginReset>((_, emit) => emit(const PharmacyLoginInitial()));
   }
 
   final PharmacyLoginService _service;

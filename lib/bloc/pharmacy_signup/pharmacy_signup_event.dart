@@ -11,7 +11,10 @@ class PharmacySignupSubmitted extends PharmacySignupEvent {
     required this.email,
     required this.phone,
     required this.businessAddress,
+    this.latitude,
+    this.longitude,
     required this.gphcNumber,
+    required this.password,
     this.licenseDocument,
   });
 
@@ -20,7 +23,10 @@ class PharmacySignupSubmitted extends PharmacySignupEvent {
   final String email;
   final String phone;
   final String businessAddress;
+  final double? latitude;
+  final double? longitude;
   final String gphcNumber;
+  final String password;
   final File? licenseDocument;
 }
 

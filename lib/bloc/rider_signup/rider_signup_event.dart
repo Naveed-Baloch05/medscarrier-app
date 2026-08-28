@@ -12,9 +12,8 @@ class RiderSignupSubmitted extends RiderSignupEvent {
     required this.vehicleType,
     required this.vehicleReg,
     required this.password,
-    this.profilePhoto,
-    this.drivingLicenceFront,
-    this.drivingLicenceBack,
+    this.licenseFront,
+    this.licenseBack,
   });
 
   final String fullName;
@@ -23,9 +22,8 @@ class RiderSignupSubmitted extends RiderSignupEvent {
   final String vehicleType;
   final String vehicleReg;
   final String password;
-  final File? profilePhoto;
-  final File? drivingLicenceFront;
-  final File? drivingLicenceBack;
+  final File? licenseFront;
+  final File? licenseBack;
 }
 
 class RiderSignupReset extends RiderSignupEvent {

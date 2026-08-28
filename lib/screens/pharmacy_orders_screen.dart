@@ -288,7 +288,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
-                          initialValue: status,
+                          value: status,
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.flag_outlined),
                             border: OutlineInputBorder(

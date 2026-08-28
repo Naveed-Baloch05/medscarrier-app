@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/medicine_model.dart';
+
 class PharmacyMedicineOptions {
   static void show({
     required BuildContext context,
-    required Map<String, dynamic> medicine,
+    required MedicineModel medicine,
     required VoidCallback onEdit,
     required VoidCallback onDelete,
   }) {
@@ -24,7 +26,7 @@ class PharmacyMedicineOptions {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  medicine['name'],
+                  medicine.name,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,

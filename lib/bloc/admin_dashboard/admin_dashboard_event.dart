@@ -30,3 +30,24 @@ class AdminDashboardAutoAssignOrder extends AdminDashboardEvent {
   const AdminDashboardAutoAssignOrder(this.orderId);
   final String orderId;
 }
+
+class AdminDashboardPendingPharmaciesUpdated extends AdminDashboardEvent {
+  const AdminDashboardPendingPharmaciesUpdated(this.pendingPharmacies);
+  final List<dynamic> pendingPharmacies;
+}
+
+class AdminDashboardApproveRider extends AdminDashboardEvent {
+  const AdminDashboardApproveRider(this.applicationId);
+  final String applicationId;
+}
+
+class AdminDashboardRejectRider extends AdminDashboardEvent {
+  const AdminDashboardRejectRider(this.applicationId, {this.reason = ''});
+  final String applicationId;
+  final String reason;
+}
+
+class AdminDashboardPendingRidersUpdated extends AdminDashboardEvent {
+  const AdminDashboardPendingRidersUpdated(this.pendingRiders);
+  final List<dynamic> pendingRiders;
+}

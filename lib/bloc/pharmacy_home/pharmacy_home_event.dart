@@ -3,9 +3,13 @@ abstract class PharmacyHomeEvent {
 }
 
 class LoadPharmacyHome extends PharmacyHomeEvent {
-  const LoadPharmacyHome();
+  const LoadPharmacyHome(this.pharmacyId);
+
+  final String pharmacyId;
 }
 
 class PharmacyHomeRefreshed extends PharmacyHomeEvent {
-  const PharmacyHomeRefreshed();
+  const PharmacyHomeRefreshed(this.pharmacyId);
+
+  final String pharmacyId;
 }

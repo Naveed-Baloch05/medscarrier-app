@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-// IMPORTANT:
-// This connects the delivery details screen to the
-// separate QR scanner screen.
+import '../bloc/rider_delivery_details/rider_delivery_details_bloc.dart';
+import '../bloc/rider_delivery_details/rider_delivery_details_event.dart';
+import '../bloc/rider_delivery_details/rider_delivery_details_state.dart';
+import '../models/order_model.dart';
 import 'rider_qr_scanner_screen.dart';
 
 class RiderDeliveryDetailsScreen extends StatefulWidget {
-  final Map<String, dynamic> delivery;
-
   const RiderDeliveryDetailsScreen({
     super.key,
-    required this.delivery,
+    required this.orderId,
+    this.initialOrder,
   });
+
+  final String orderId;
+  final OrderModel? initialOrder;
 
   @override
   State<RiderDeliveryDetailsScreen> createState() =>
@@ -20,43 +24,47 @@ class RiderDeliveryDetailsScreen extends StatefulWidget {
 
 class _RiderDeliveryDetailsScreenState
     extends State<RiderDeliveryDetailsScreen> {
-  late Map<String, dynamic> delivery;
+  late final RiderDeliveryDetailsBloc _bloc;
 
-  bool qrScanned = false;
   bool medicineConfirmed = false;
 
   final TextEditingController recipientController =
-  TextEditingController();
+      TextEditingController();
 
   final List<Offset> signaturePoints = [];
+
+  String get _orderId => widget.orderId;
 
   @override
   void initState() {
     super.initState();
-
-    delivery = Map<String, dynamic>.from(widget.delivery);
-
-    // Support the existing data format.
-    if (delivery['status'] == 'Ready') {
-      delivery['status'] = 'Assigned';
-    }
-
-    if (delivery['status'] == 'Delivered') {
-      delivery['status'] = 'Completed';
-    }
-
-    // If this delivery already contains a pickup QR value,
-    // consider the QR step completed.
-    if (delivery['pickupQrValue'] != null &&
-        delivery['pickupQrValue'].toString().trim().isNotEmpty) {
-      qrScanned = true;
-    }
+    _bloc = RiderDeliveryDetailsBloc();
+    _bloc.add(SubscribeToOrder(_orderId));
   }
 
   @override
   void dispose() {
     recipientController.dispose();
+    _bloc.close();
     super.dispose();
+  }
+
+  OrderModel get _order {
+    final s = _bloc.state;
+    if (s is RiderDeliveryDetailsLoaded) return s.order;
+    if (s is RiderDeliveryDetailsUpdating) return s.order;
+    if (s is RiderDeliveryDetailsOperationSuccess) return s.order;
+    if (s is RiderDeliveryDetailsError && s.order != null) return s.order!;
+    if (widget.initialOrder != null) return widget.initialOrder!;
+    throw StateError('Order not loaded');
+  }
+
+  bool get _qrAlreadyScanned {
+    final s = _bloc.state;
+    if (s is RiderDeliveryDetailsLoaded) return s.qrAlreadyScanned;
+    if (s is RiderDeliveryDetailsUpdating) return s.qrAlreadyScanned;
+    if (s is RiderDeliveryDetailsOperationSuccess) return s.qrAlreadyScanned;
+    return false;
   }
 
   // ============================================================
@@ -77,17 +85,6 @@ class _RiderDeliveryDetailsScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final String status =
-        delivery['status']?.toString() ?? 'Assigned';
-
-    final bool controlled =
-        delivery['controlled'] == true ||
-            delivery['controlledDrug'] == true;
-
-    final bool coldChain =
-        delivery['coldChain'] == true;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -107,54 +104,119 @@ class _RiderDeliveryDetailsScreenState
           ),
         ),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            16,
-            4,
-            16,
-            30,
-          ),
-          children: [
-            _buildOrderHeader(
-              context,
-              status,
-            ),
+      body: BlocListener<RiderDeliveryDetailsBloc, RiderDeliveryDetailsState>(
+        bloc: _bloc,
+        listener: (context, state) {
+          if (state is RiderDeliveryDetailsOperationSuccess) {
+            _showMessage(context, state.message, isError: false);
+          } else if (state is RiderDeliveryDetailsError &&
+              state.message.isNotEmpty) {
+            _showMessage(context, state.message, isError: true);
+          }
+        },
+        child: BlocBuilder<RiderDeliveryDetailsBloc, RiderDeliveryDetailsState>(
+          bloc: _bloc,
+          builder: (context, state) {
+          if (state is RiderDeliveryDetailsInitial ||
+              state is RiderDeliveryDetailsLoading) {
+            return _buildLoading(context);
+          }
 
-            const SizedBox(height: 14),
+          final OrderModel order;
+          try {
+            order = _order;
+          } catch (_) {
+            return const _ErrorView(message: 'Order not loaded.');
+          }
 
-            _buildRouteCard(
-              context,
-              isDark,
-            ),
+          if (state is RiderDeliveryDetailsError && state.order == null) {
+            return _ErrorView(message: state.message);
+          }
 
-            const SizedBox(height: 14),
+          final String status = _normalizedStatus(order.status);
+          final bool controlled = order.controlledDrug;
+          final bool coldChain = order.coldChain;
 
-            _buildDeliveryInfoCard(
-              context,
-              isDark,
-            ),
-
-            if (controlled || coldChain) ...[
-              const SizedBox(height: 14),
-              _buildRequirementsCard(
-                context,
-                isDark,
-                controlled,
-                coldChain,
+          return SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                4,
+                16,
+                30,
               ),
-            ],
+              children: [
+                _buildOrderHeader(context, order, status),
 
-            const SizedBox(height: 18),
+                const SizedBox(height: 14),
 
-            _buildActionSection(
-              context,
-              status,
-              controlled,
-              coldChain,
+                _buildRouteCard(context, order),
+
+                const SizedBox(height: 14),
+
+                _buildDeliveryInfoCard(context, order),
+
+                if (controlled || coldChain) ...[
+                  const SizedBox(height: 14),
+                  _buildRequirementsCard(
+                    context,
+                    controlled,
+                    coldChain,
+                  ),
+                ],
+
+                const SizedBox(height: 18),
+
+                _buildActionSection(
+                  context,
+                  status,
+                  controlled,
+                  coldChain,
+                ),
+              ],
             ),
-          ],
+          );
+          },
         ),
+      ),
+    );
+  }
+
+  void _showMessage(BuildContext context, String message,
+      {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : primary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  String _normalizedStatus(String status) {
+    switch (status) {
+      case 'Ready':
+        return 'Assigned';
+      case 'Delivered':
+        return 'Completed';
+      default:
+        return status;
+    }
+  }
+
+  Widget _buildLoading(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: primary),
+          const SizedBox(height: 16),
+          Text(
+            'Loading delivery...',
+            style: TextStyle(color: cs.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
@@ -164,9 +226,10 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildOrderHeader(
-      BuildContext context,
-      String status,
-      ) {
+    BuildContext context,
+    OrderModel order,
+    String status,
+  ) {
     final theme = Theme.of(context);
     final color = _statusColor(status);
 
@@ -200,12 +263,10 @@ class _RiderDeliveryDetailsScreenState
           Expanded(
             child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+                  CrossAxisAlignment.start,
               children: [
                 Text(
-                  delivery['id']?.toString() ??
-                      delivery['orderId']?.toString() ??
-                      '#MC-0000',
+                  '#${order.id}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -215,8 +276,7 @@ class _RiderDeliveryDetailsScreenState
                 const SizedBox(height: 4),
 
                 Text(
-                  delivery['pharmacy']?.toString() ??
-                      'Pharmacy',
+                  order.pharmacyName,
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.grey,
@@ -241,10 +301,10 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildStatusBadge(
-      BuildContext context,
-      String status,
-      Color color,
-      ) {
+    BuildContext context,
+    String status,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 10,
@@ -286,24 +346,26 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildRouteCard(
-      BuildContext context,
-      bool isDark,
-      ) {
-    final String pickup =
-        delivery['pickup']?.toString() ??
-            'Pickup address';
+    BuildContext context,
+    OrderModel order,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final String dropoff =
-        delivery['dropoff']?.toString() ??
-            'Drop-off address';
+    final String pickup = order.pickupAddress.isEmpty
+        ? 'Pickup address'
+        : order.pickupAddress;
 
-    final String pharmacy =
-        delivery['pharmacy']?.toString() ??
-            'Pharmacy';
+    final String dropoff = order.dropoffAddress.isEmpty
+        ? 'Drop-off address'
+        : order.dropoffAddress;
 
-    final String customer =
-        delivery['customer']?.toString() ??
-            'Customer';
+    final String pharmacy = order.pharmacyName.isEmpty
+        ? 'Pharmacy'
+        : order.pharmacyName;
+
+    final String customer = order.customerName.isEmpty
+        ? 'Customer'
+        : order.customerName;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -316,7 +378,7 @@ class _RiderDeliveryDetailsScreenState
       ),
       child: Column(
         crossAxisAlignment:
-        CrossAxisAlignment.start,
+            CrossAxisAlignment.start,
         children: [
           const Text(
             'Delivery Route',
@@ -331,7 +393,7 @@ class _RiderDeliveryDetailsScreenState
           // PICKUP
           Row(
             crossAxisAlignment:
-            CrossAxisAlignment.start,
+                CrossAxisAlignment.start,
             children: [
               _routeIcon(
                 Icons.storefront_outlined,
@@ -344,7 +406,7 @@ class _RiderDeliveryDetailsScreenState
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                      CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'PICKUP',
@@ -394,7 +456,7 @@ class _RiderDeliveryDetailsScreenState
               decoration: BoxDecoration(
                 color: green.withValues(alpha: 0.30),
                 borderRadius:
-                BorderRadius.circular(2),
+                    BorderRadius.circular(2),
               ),
             ),
           ),
@@ -402,7 +464,7 @@ class _RiderDeliveryDetailsScreenState
           // DROP OFF
           Row(
             crossAxisAlignment:
-            CrossAxisAlignment.start,
+                CrossAxisAlignment.start,
             children: [
               _routeIcon(
                 Icons.location_on_outlined,
@@ -415,7 +477,7 @@ class _RiderDeliveryDetailsScreenState
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                      CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'DROP-OFF',
@@ -457,10 +519,10 @@ class _RiderDeliveryDetailsScreenState
   }
 
   Widget _routeIcon(
-      IconData icon,
-      Color color,
-      bool isDark,
-      ) {
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
     return Container(
       width: 38,
       height: 38,
@@ -481,16 +543,18 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildDeliveryInfoCard(
-      BuildContext context,
-      bool isDark,
-      ) {
-    final String distance =
-        delivery['distance']?.toString() ?? '—';
+    BuildContext context,
+    OrderModel order,
+  ) {
+    final String distance = order.distance?.isNotEmpty == true
+        ? order.distance!
+        : '—';
 
-    final String time =
-        delivery['time']?.toString() ??
-            delivery['eta']?.toString() ??
-            '—';
+    final String time = order.estimatedTime?.isNotEmpty == true
+        ? order.estimatedTime!
+        : (order.deliveryTimeMinutes != null
+            ? '${order.deliveryTimeMinutes} min'
+            : '—');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -532,10 +596,10 @@ class _RiderDeliveryDetailsScreenState
   }
 
   Widget _infoItem(
-      IconData icon,
-      String value,
-      String label,
-      ) {
+    IconData icon,
+    String value,
+    String label,
+  ) {
     return Column(
       children: [
         Icon(
@@ -572,11 +636,10 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildRequirementsCard(
-      BuildContext context,
-      bool isDark,
-      bool controlled,
-      bool coldChain,
-      ) {
+    BuildContext context,
+    bool controlled,
+    bool coldChain,
+  ) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -588,7 +651,7 @@ class _RiderDeliveryDetailsScreenState
       ),
       child: Column(
         crossAxisAlignment:
-        CrossAxisAlignment.start,
+            CrossAxisAlignment.start,
         children: [
           const Text(
             'Delivery Requirements',
@@ -605,7 +668,7 @@ class _RiderDeliveryDetailsScreenState
               icon: Icons.verified_user_outlined,
               title: 'Controlled Drug',
               subtitle:
-              'Recipient signature is required at handover.',
+                  'Recipient signature is required at handover.',
               color: orange,
             ),
 
@@ -617,7 +680,7 @@ class _RiderDeliveryDetailsScreenState
               icon: Icons.ac_unit_rounded,
               title: 'Cold-chain Medicine',
               subtitle:
-              'Keep medicine between 2–8°C.',
+                  'Keep medicine between 2–8°C.',
               color: cyan,
             ),
         ],
@@ -653,7 +716,7 @@ class _RiderDeliveryDetailsScreenState
           Expanded(
             child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -688,11 +751,11 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildActionSection(
-      BuildContext context,
-      String status,
-      bool controlled,
-      bool coldChain,
-      ) {
+    BuildContext context,
+    String status,
+    bool controlled,
+    bool coldChain,
+  ) {
     switch (status) {
       case 'Assigned':
         return _buildAssignedAction(context);
@@ -721,11 +784,11 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildAssignedAction(
-      BuildContext context,
-      ) {
+    BuildContext context,
+  ) {
     return Column(
       crossAxisAlignment:
-      CrossAxisAlignment.start,
+          CrossAxisAlignment.start,
       children: [
         const Text(
           'Pickup Action',
@@ -763,10 +826,14 @@ class _RiderDeliveryDetailsScreenState
 
         _secondaryButton(
           icon: Icons.qr_code_scanner_rounded,
-          label: 'Scan Pickup QR Code',
-          onPressed: () {
-            _openQrScanner(context);
-          },
+          label: _qrAlreadyScanned
+              ? 'Pickup QR Scanned'
+              : 'Scan Pickup QR Code',
+          onPressed: _qrAlreadyScanned
+              ? null
+              : () {
+                  _openQrScanner(context);
+                },
         ),
       ],
     );
@@ -777,17 +844,17 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildPickedUpAction(
-      BuildContext context,
-      ) {
+    BuildContext context,
+  ) {
     return Column(
       crossAxisAlignment:
-      CrossAxisAlignment.start,
+          CrossAxisAlignment.start,
       children: [
         _stepCompleteCard(
           icon: Icons.check_circle_rounded,
           title: 'Pickup confirmed',
           subtitle:
-          'The medicine has been picked up from the pharmacy.',
+              'The medicine has been picked up from the pharmacy.',
           color: green,
         ),
 
@@ -810,7 +877,9 @@ class _RiderDeliveryDetailsScreenState
           icon: Icons.local_shipping_outlined,
           label: 'Start Delivery',
           onPressed: () {
-            _setStatus('On the Way');
+            context
+                .read<RiderDeliveryDetailsBloc>()
+                .add(StartDelivery(_orderId));
           },
         ),
       ],
@@ -822,18 +891,18 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildOnTheWayAction(
-      BuildContext context,
-      bool controlled,
-      ) {
+    BuildContext context,
+    bool controlled,
+  ) {
     return Column(
       crossAxisAlignment:
-      CrossAxisAlignment.start,
+          CrossAxisAlignment.start,
       children: [
         _stepCompleteCard(
           icon: Icons.local_shipping_rounded,
           title: 'Delivery is on the way',
           subtitle:
-          'Proceed to the customer drop-off location.',
+              'Proceed to the customer drop-off location.',
           color: purple,
         ),
 
@@ -871,8 +940,8 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _buildCompletedState(
-      BuildContext context,
-      ) {
+    BuildContext context,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -895,7 +964,7 @@ class _RiderDeliveryDetailsScreenState
           Expanded(
             child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   'Delivery Completed',
@@ -931,48 +1000,20 @@ class _RiderDeliveryDetailsScreenState
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => RiderQrScannerScreen(
-          delivery: delivery,
+          orderId: _orderId,
         ),
       ),
     );
 
     if (result != null && result.trim().isNotEmpty) {
-      _handlePickupQrScanned(result);
-    }
-  }
-
-  // ============================================================
-  // QR SCANNED CALLBACK
-  // ============================================================
-
-  void _handlePickupQrScanned(
-      String qrValue,
-      ) {
-    final String cleanQrValue = qrValue.trim();
-
-    if (cleanQrValue.isEmpty) {
-      _showErrorMessage(
-        context,
-        'Invalid QR code.',
+      if (!mounted) return;
+      _bloc.add(
+        VerifyPickupQR(
+          orderId: _orderId,
+          qrValue: result,
+        ),
       );
-      return;
     }
-
-    // Store the scanned QR value.
-    delivery['pickupQrValue'] = cleanQrValue;
-
-    // Mark QR as scanned.
-    qrScanned = true;
-
-    // Move delivery to Picked Up.
-    setState(() {
-      delivery['status'] = 'Picked Up';
-    });
-
-    _showSuccessMessage(
-      context,
-      'Pickup QR scanned successfully.',
-    );
   }
 
   // ============================================================
@@ -980,9 +1021,9 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   void _showCompletionSheet(
-      BuildContext context,
-      bool controlled,
-      ) {
+    BuildContext context,
+    bool controlled,
+  ) {
     medicineConfirmed = false;
     recipientController.clear();
     signaturePoints.clear();
@@ -991,7 +1032,7 @@ class _RiderDeliveryDetailsScreenState
       context: context,
       isScrollControlled: true,
       backgroundColor:
-      Theme.of(context).cardColor,
+          Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(24),
@@ -1000,9 +1041,9 @@ class _RiderDeliveryDetailsScreenState
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (
-              context,
-              setSheetState,
-              ) {
+            context,
+            setSheetState,
+          ) {
             final bool hasRecipient =
                 recipientController.text
                     .trim()
@@ -1026,32 +1067,32 @@ class _RiderDeliveryDetailsScreenState
                   right: 20,
                   top: 12,
                   bottom:
-                  MediaQuery.of(context)
-                      .viewInsets
-                      .bottom +
-                      20,
+                      MediaQuery.of(context)
+                          .viewInsets
+                          .bottom +
+                          20,
                 ),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize:
-                    MainAxisSize.min,
+                        MainAxisSize.min,
                     crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                        CrossAxisAlignment.start,
                     children: [
                       Center(
                         child: Container(
                           width: 42,
                           height: 4,
                           decoration:
-                          BoxDecoration(
-                            color: Colors.grey
-                                .withValues(
-                              alpha: 0.30,
-                            ),
-                            borderRadius:
-                            BorderRadius
-                                .circular(4),
-                          ),
+                              BoxDecoration(
+                                color: Colors.grey
+                                    .withValues(
+                                  alpha: 0.30,
+                                ),
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(4),
+                              ),
                         ),
                       ),
 
@@ -1062,7 +1103,7 @@ class _RiderDeliveryDetailsScreenState
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight:
-                          FontWeight.w800,
+                              FontWeight.w800,
                         ),
                       ),
 
@@ -1087,34 +1128,36 @@ class _RiderDeliveryDetailsScreenState
 
                         TextField(
                           controller:
-                          recipientController,
+                              recipientController,
                           onChanged: (_) {
                             setSheetState(
                                   () {},
                             );
                           },
                           decoration:
-                          InputDecoration(
-                            hintText:
-                            'Enter recipient name',
-                            prefixIcon:
-                            const Icon(
-                              Icons.person_outline,
-                            ),
-                            filled: true,
-                            fillColor:
-                            Colors.grey.shade50,
-                            border:
-                            OutlineInputBorder(
-                              borderRadius:
-                              BorderRadius
-                                  .circular(
-                                12,
+                              InputDecoration(
+                                hintText:
+                                    'Enter recipient name',
+                                prefixIcon:
+                                    const Icon(
+                                      Icons.person_outline,
+                                    ),
+                                filled: true,
+                                fillColor:
+                                    Colors.grey
+                                        .shade50,
+                                border:
+                                    OutlineInputBorder(
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                            12,
+                                          ),
+                                      borderSide:
+                                          BorderSide
+                                              .none,
+                                    ),
                               ),
-                              borderSide:
-                              BorderSide.none,
-                            ),
-                          ),
                         ),
 
                         const SizedBox(height: 16),
@@ -1129,83 +1172,88 @@ class _RiderDeliveryDetailsScreenState
                           height: 130,
                           width: double.infinity,
                           decoration:
-                          BoxDecoration(
-                            color:
-                            Colors.grey.shade50,
-                            borderRadius:
-                            BorderRadius
-                                .circular(
-                              12,
-                            ),
-                            border: Border.all(
-                              color: Colors
-                                  .grey.shade300,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius:
-                            BorderRadius
-                                .circular(
-                              12,
-                            ),
-                            child:
-                            GestureDetector(
-                              onPanStart:
-                                  (details) {
-                                setSheetState(
-                                      () {
-                                    signaturePoints
-                                        .add(
-                                      details
-                                          .localPosition,
-                                    );
-                                  },
-                                );
-                              },
-                              onPanUpdate:
-                                  (details) {
-                                setSheetState(
-                                      () {
-                                    signaturePoints
-                                        .add(
-                                      details
-                                          .localPosition,
-                                    );
-                                  },
-                                );
-                              },
-                              onPanEnd: (_) {
-                                setSheetState(
-                                      () {
-                                    signaturePoints
-                                        .add(
-                                      Offset.infinite,
-                                    );
-                                  },
-                                );
-                              },
-                              child:
-                              CustomPaint(
-                                painter:
-                                _SignaturePainter(
-                                  points:
-                                  signaturePoints,
-                                ),
-                                child:
-                                const Center(
-                                  child: Text(
-                                    'Sign here',
-                                    style:
-                                    TextStyle(
-                                      color:
-                                      Colors.grey,
-                                      fontSize:
-                                      12,
-                                    ),
-                                  ),
+                              BoxDecoration(
+                                color:
+                                    Colors.grey
+                                        .shade50,
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                          12,
+                                        ),
+                                border: Border.all(
+                                  color: Colors
+                                      .grey
+                                      .shade300,
                                 ),
                               ),
-                            ),
+                          child: ClipRRect(
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                                  12,
+                                ),
+                            child:
+                                GestureDetector(
+                                  onPanStart:
+                                      (details) {
+                                    setSheetState(
+                                          () {
+                                        signaturePoints
+                                            .add(
+                                          details
+                                              .localPosition,
+                                        );
+                                      },
+                                    );
+                                  },
+                                  onPanUpdate:
+                                      (details) {
+                                    setSheetState(
+                                          () {
+                                        signaturePoints
+                                            .add(
+                                          details
+                                              .localPosition,
+                                        );
+                                      },
+                                    );
+                                  },
+                                  onPanEnd: (_) {
+                                    setSheetState(
+                                          () {
+                                        signaturePoints
+                                            .add(
+                                          Offset
+                                              .infinite,
+                                        );
+                                      },
+                                    );
+                                  },
+                                  child:
+                                      CustomPaint(
+                                        painter:
+                                            _SignaturePainter(
+                                              points:
+                                                  signaturePoints,
+                                            ),
+                                        child:
+                                            const Center(
+                                              child:
+                                                  Text(
+                                                    'Sign here',
+                                                    style:
+                                                        TextStyle(
+                                                          color:
+                                                              Colors
+                                                                  .grey,
+                                                          fontSize:
+                                                              12,
+                                                        ),
+                                                  ),
+                                            ),
+                                      ),
+                                ),
                           ),
                         ),
 
@@ -1213,7 +1261,7 @@ class _RiderDeliveryDetailsScreenState
 
                         Align(
                           alignment:
-                          Alignment.centerRight,
+                              Alignment.centerRight,
                           child: TextButton(
                             onPressed: () {
                               setSheetState(
@@ -1224,9 +1272,9 @@ class _RiderDeliveryDetailsScreenState
                               );
                             },
                             child:
-                            const Text(
-                              'Clear Signature',
-                            ),
+                                const Text(
+                                  'Clear Signature',
+                                ),
                           ),
                         ),
 
@@ -1234,9 +1282,9 @@ class _RiderDeliveryDetailsScreenState
 
                         CheckboxListTile(
                           contentPadding:
-                          EdgeInsets.zero,
+                              EdgeInsets.zero,
                           value:
-                          medicineConfirmed,
+                              medicineConfirmed,
                           onChanged:
                               (value) {
                             setSheetState(
@@ -1248,27 +1296,27 @@ class _RiderDeliveryDetailsScreenState
                             );
                           },
                           title:
-                          const Text(
-                            'Medicine handed over successfully',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight:
-                              FontWeight
-                                  .w600,
-                            ),
-                          ),
+                              const Text(
+                                'Medicine handed over successfully',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight:
+                                      FontWeight
+                                          .w600,
+                                ),
+                              ),
                           subtitle:
-                          const Text(
-                            'Confirm the correct medicine was handed to the recipient.',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color:
-                              Colors.grey,
-                            ),
-                          ),
+                              const Text(
+                                'Confirm the correct medicine was handed to the recipient.',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color:
+                                      Colors.grey,
+                                ),
+                              ),
                           controlAffinity:
-                          ListTileControlAffinity
-                              .leading,
+                              ListTileControlAffinity
+                                  .leading,
                         ),
                       ],
 
@@ -1278,48 +1326,51 @@ class _RiderDeliveryDetailsScreenState
                         width: double.infinity,
                         height: 50,
                         child:
-                        ElevatedButton.icon(
-                          onPressed:
-                          canComplete
-                              ? () {
-                            Navigator.pop(
-                              sheetContext,
-                            );
+                            ElevatedButton.icon(
+                              onPressed:
+                                  canComplete
+                                      ? () {
+                                    Navigator.pop(
+                                      sheetContext,
+                                    );
 
-                            _completeDelivery();
-                          }
-                              : null,
-                          style:
-                          ElevatedButton
-                              .styleFrom(
-                            backgroundColor:
-                            primary,
-                            foregroundColor:
-                            Colors.white,
-                            disabledBackgroundColor:
-                            Colors
-                                .grey.shade300,
-                            elevation: 0,
-                            shape:
-                            RoundedRectangleBorder(
-                              borderRadius:
-                              BorderRadius
-                                  .circular(
-                                12,
+                                    _completeDelivery();
+                                  }
+                                      : null,
+                              style:
+                                  ElevatedButton
+                                      .styleFrom(
+                                        backgroundColor:
+                                            primary,
+                                        foregroundColor:
+                                            Colors
+                                                .white,
+                                        disabledBackgroundColor:
+                                            Colors
+                                                .grey
+                                                .shade300,
+                                        elevation: 0,
+                                        shape:
+                                            RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius
+                                                      .circular(
+                                                        12,
+                                                      ),
+                                            ),
+                                      ),
+                              icon: const Icon(
+                                Icons.check_rounded,
+                              ),
+                              label: const Text(
+                                'Complete Delivery',
+                                style: TextStyle(
+                                  fontWeight:
+                                      FontWeight
+                                          .w700,
+                                ),
                               ),
                             ),
-                          ),
-                          icon: const Icon(
-                            Icons.check_rounded,
-                          ),
-                          label: const Text(
-                            'Complete Delivery',
-                            style: TextStyle(
-                              fontWeight:
-                              FontWeight.w700,
-                            ),
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -1337,8 +1388,8 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Widget _completionSectionTitle(
-      String title,
-      ) {
+    String title,
+  ) {
     return Text(
       title,
       style: const TextStyle(
@@ -1380,7 +1431,7 @@ class _RiderDeliveryDetailsScreenState
           Expanded(
             child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment.start,
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -1428,7 +1479,7 @@ class _RiderDeliveryDetailsScreenState
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius:
-            BorderRadius.circular(12),
+                BorderRadius.circular(12),
           ),
         ),
         icon: Icon(
@@ -1453,7 +1504,7 @@ class _RiderDeliveryDetailsScreenState
   Widget _secondaryButton({
     required IconData icon,
     required String label,
-    required VoidCallback onPressed,
+    VoidCallback? onPressed,
   }) {
     final theme = Theme.of(context);
 
@@ -1465,7 +1516,7 @@ class _RiderDeliveryDetailsScreenState
         style: OutlinedButton.styleFrom(
           backgroundColor: theme.cardColor,
           foregroundColor:
-          theme.colorScheme.onSurface,
+              theme.colorScheme.onSurface,
           side: BorderSide(
             color: Colors.grey.withValues(
               alpha: 0.25,
@@ -1473,7 +1524,7 @@ class _RiderDeliveryDetailsScreenState
           ),
           shape: RoundedRectangleBorder(
             borderRadius:
-            BorderRadius.circular(12),
+                BorderRadius.circular(12),
           ),
         ),
         icon: Icon(
@@ -1496,8 +1547,8 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   Color _statusColor(
-      String status,
-      ) {
+    String status,
+  ) {
     switch (status) {
       case 'Assigned':
         return orange;
@@ -1519,35 +1570,30 @@ class _RiderDeliveryDetailsScreenState
   }
 
   // ============================================================
-  // STATUS UPDATE
-  // ============================================================
-
-  void _setStatus(
-      String status,
-      ) {
-    setState(() {
-      delivery['status'] = status;
-    });
-
-    _showSuccessMessage(
-      context,
-      'Delivery status updated to $status.',
-    );
-  }
-
-  // ============================================================
   // COMPLETE DELIVERY
   // ============================================================
 
   void _completeDelivery() {
-    setState(() {
-      delivery['status'] = 'Completed';
-    });
+    final List<Map<String, double>>? signature = _encodeSignature();
+    context.read<RiderDeliveryDetailsBloc>().add(
+          CompleteDelivery(
+            orderId: _orderId,
+            recipientName: recipientController.text.trim(),
+            signaturePoints: signature,
+            medicineHandoverConfirmed: medicineConfirmed,
+          ),
+        );
+  }
 
-    _showSuccessMessage(
-      context,
-      'Delivery completed successfully.',
-    );
+  List<Map<String, double>>? _encodeSignature() {
+    if (signaturePoints.length <= 2) return null;
+    return signaturePoints
+        .where((p) => p != Offset.infinite)
+        .map((p) => <String, double>{
+              'x': p.dx,
+              'y': p.dy,
+            })
+        .toList();
   }
 
   // ============================================================
@@ -1555,9 +1601,9 @@ class _RiderDeliveryDetailsScreenState
   // ============================================================
 
   void _showNavigationMessage(
-      BuildContext context,
-      String message,
-      ) {
+    BuildContext context,
+    String message,
+  ) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -1565,37 +1611,35 @@ class _RiderDeliveryDetailsScreenState
       ),
     );
   }
+}
 
-  // ============================================================
-  // SUCCESS MESSAGE
-  // ============================================================
+// ================================================================
+// ERROR VIEW
+// ================================================================
 
-  void _showSuccessMessage(
-      BuildContext context,
-      String message,
-      ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message});
 
-  // ============================================================
-  // ERROR MESSAGE
-  // ============================================================
+  final String message;
 
-  void _showErrorMessage(
-      BuildContext context,
-      String message,
-      ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade700,
-        behavior: SnackBarBehavior.floating,
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 48, color: cs.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              message.isEmpty ? 'Unable to load delivery.' : message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1614,9 +1658,9 @@ class _SignaturePainter extends CustomPainter {
 
   @override
   void paint(
-      Canvas canvas,
-      Size size,
-      ) {
+    Canvas canvas,
+    Size size,
+  ) {
     final paint = Paint()
       ..color = const Color(0xFF191C1B)
       ..strokeWidth = 2.2
@@ -1624,9 +1668,9 @@ class _SignaturePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     for (
-    int i = 0;
-    i < points.length - 1;
-    i++
+      int i = 0;
+      i < points.length - 1;
+      i++
     ) {
       final current = points[i];
       final next = points[i + 1];
@@ -1646,8 +1690,8 @@ class _SignaturePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(
-      covariant _SignaturePainter oldDelegate,
-      ) {
+    covariant _SignaturePainter oldDelegate,
+  ) {
     return oldDelegate.points != points;
   }
 }

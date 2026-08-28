@@ -27,7 +27,10 @@ class PharmacySignupBloc extends Bloc<PharmacySignupEvent, PharmacySignupState> 
         email: event.email,
         phone: event.phone,
         businessAddress: event.businessAddress,
+        latitude: event.latitude,
+        longitude: event.longitude,
         gphcNumber: event.gphcNumber,
+        password: event.password,
         licenseDocument: event.licenseDocument,
       );
 

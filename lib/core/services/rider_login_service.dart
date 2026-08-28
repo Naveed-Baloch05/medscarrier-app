@@ -3,36 +3,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/rider_model.dart';
 
-/// Set to `true` to skip Firebase login entirely during development.
-/// Set to `false` for real Firebase authentication.
-const bool kUseMockRiderLogin = true;
-
 class RiderLoginService {
   RiderLoginService._();
   static final RiderLoginService instance = RiderLoginService._();
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
 
   Future<RiderModel> login({
     required String email,
     required String password,
   }) async {
-    if (kUseMockRiderLogin) {
-      return RiderModel(
-        id: 'mock-rider-001',
-        fullName: 'Dev Rider',
-        email: email.trim(),
-        phone: '07000000000',
-        vehicleType: 'Car',
-        vehicleReg: 'MOCK 1A',
-        active: true,
-        createdAt: DateTime.now(),
-      );
-    }
+    final normalizedEmail = email.trim().toLowerCase();
 
     final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
+      email: normalizedEmail,
       password: password,
     );
 
@@ -43,67 +28,133 @@ class RiderLoginService {
 
     final uid = firebaseUser.uid;
 
-    final doc = await _firestore.collection('users').doc(uid).get();
+    DocumentSnapshot<Map<String, dynamic>>? doc;
 
-    if (!doc.exists || doc.data() == null) {
+    // 1. Check direct doc by UID
+    final directDoc = await _firestore.collection('riders').doc(uid).get();
+    if (directDoc.exists && directDoc.data() != null) {
+      doc = directDoc;
+    }
+
+    // 2. Look up by 'uid' field
+    if (doc == null) {
+      final uidQuery = await _firestore
+          .collection('riders')
+          .where('uid', isEqualTo: uid)
+          .limit(1)
+          .get();
+      if (uidQuery.docs.isNotEmpty) {
+        doc = uidQuery.docs.first;
+      }
+    }
+
+    // 3. Look up by 'id' field
+    if (doc == null) {
+      final idQuery = await _firestore
+          .collection('riders')
+          .where('id', isEqualTo: uid)
+          .limit(1)
+          .get();
+      if (idQuery.docs.isNotEmpty) {
+        doc = idQuery.docs.first;
+      }
+    }
+
+    // 4. Look up by email in riders collection
+    if (doc == null) {
+      final emailQuery = await _firestore
+          .collection('riders')
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+      if (emailQuery.docs.isNotEmpty) {
+        doc = emailQuery.docs.first;
+      }
+    }
+
+    // 5. If not found in riders collection, check rider_applications
+    if (doc == null) {
       final appSnapshot = await _firestore
           .collection('rider_applications')
-          .where('uid', isEqualTo: uid)
+          .where('email', isEqualTo: normalizedEmail)
           .limit(1)
           .get();
 
       if (appSnapshot.docs.isNotEmpty) {
         final appData = appSnapshot.docs.first.data();
-        final status = appData['status'] as String? ?? '';
-
-        await _auth.signOut();
+        final status = (appData['status'] as String? ?? '').toLowerCase();
+        final rejectionReason = appData['rejectionReason'] as String? ?? '';
 
         if (status == 'pending') {
+          await _auth.signOut();
           throw Exception(
-            'Your application is still waiting for admin approval.',
+            'Your rider application is still pending admin approval. You will receive an email once approved.',
           );
         } else if (status == 'rejected') {
+          await _auth.signOut();
           throw Exception(
-            'Your rider application was rejected.',
+            rejectionReason.isNotEmpty
+                ? 'Your rider application was rejected: $rejectionReason'
+                : 'Your rider application was rejected. Please contact support.',
           );
         }
       }
+    }
 
+    if (doc == null || !doc.exists || doc.data() == null) {
       await _auth.signOut();
       throw Exception(
-        'Account not found. Your application may still be pending.',
+        'Your rider account has not been activated yet. Please wait for admin approval.',
       );
     }
 
     final data = doc.data()!;
-    final role = data['role'] as String? ?? '';
-    final accountStatus = data['accountStatus'] as String? ?? '';
+    final active = data['active'] as bool? ?? false;
 
-    if (role != 'rider') {
-      await _auth.signOut();
-      throw Exception('Access denied. This account is not a rider.');
-    }
-
-    if (accountStatus != 'active') {
+    if (!active) {
       await _auth.signOut();
       throw Exception(
-        'Your account is not active. Please wait for admin approval.',
+        'Your rider account is not active. Please contact support.',
       );
     }
 
+    final riderId = (data['id'] as String?)?.isNotEmpty == true
+        ? (data['id'] as String)
+        : ((data['uid'] as String?)?.isNotEmpty == true
+            ? (data['uid'] as String)
+            : (doc.id.isNotEmpty ? doc.id : uid));
+
     return RiderModel(
-      id: uid,
-      fullName: data['name'] as String? ?? '',
-      email: data['email'] as String? ?? '',
+      id: riderId,
+      fullName: data['fullName'] as String? ?? data['name'] as String? ?? '',
+      email: data['email'] as String? ?? normalizedEmail,
       phone: data['phone'] as String? ?? '',
       vehicleType: data['vehicleType'] as String? ?? '',
-      vehicleReg: data['vehicleRegistrationNumber'] as String? ?? '',
-      active: true,
+      vehicleReg: data['vehicleReg'] as String? ??
+          data['vehicleRegistrationNumber'] as String? ??
+          '',
+      online: data['online'] as bool? ?? false,
+      active: active,
+      location: data['location'] is Map
+          ? Map<String, dynamic>.from(data['location'] as Map)
+          : null,
+      deliveries: data['deliveries'] as int? ?? 0,
+      currentOrder: data['currentOrder'] as String?,
+      lastSeen: _parseTimestamp(data['lastSeen']),
+      deliveryStatus: data['deliveryStatus'] as String?,
       createdAt: _parseTimestamp(data['createdAt']),
     );
   }
 
-  DateTime? _parseTimestamp(dynamic value) {
+  Future<void> sendPasswordResetEmail(String email) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      throw Exception('Please enter your email address.');
+    }
+    await _auth.sendPasswordResetEmail(email: normalized);
+  }
+
+  static DateTime? _parseTimestamp(dynamic value) {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
     return null;

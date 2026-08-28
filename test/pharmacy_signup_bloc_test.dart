@@ -15,7 +15,7 @@ void main() {
       expect(event, isA<PharmacySignupEvent>());
     });
 
-    test('PharmacySignupSubmitted carries all fields without password', () {
+    test('PharmacySignupSubmitted carries all fields including password', () {
       const event = PharmacySignupSubmitted(
         pharmacyName: 'Boots',
         contactName: 'Sarah',
@@ -23,6 +23,7 @@ void main() {
         phone: '02071234567',
         businessAddress: '123 High St',
         gphcNumber: '1234567',
+        password: 'password123',
       );
       expect(event.pharmacyName, 'Boots');
       expect(event.contactName, 'Sarah');
@@ -30,6 +31,7 @@ void main() {
       expect(event.phone, '02071234567');
       expect(event.businessAddress, '123 High St');
       expect(event.gphcNumber, '1234567');
+      expect(event.password, 'password123');
       expect(event.licenseDocument, isNull);
     });
 

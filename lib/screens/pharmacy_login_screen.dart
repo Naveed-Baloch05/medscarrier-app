@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/pharmacy_login/pharmacy_login_bloc.dart';
 import '../bloc/pharmacy_login/pharmacy_login_event.dart';
 import '../bloc/pharmacy_login/pharmacy_login_state.dart';
+import '../core/services/pharmacy_login_service.dart';
 import 'pharmacy_home_screen.dart';
 
 class PharmacyLoginScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class PharmacyLoginScreen extends StatefulWidget {
 class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -36,28 +38,54 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
     return (shortestSide / 420).clamp(0.85, 1.1);
   }
 
+  ThemeData scaledTheme({bool isDark = false}) => ThemeData(
+        brightness: isDark ? Brightness.dark : Brightness.light,
+        colorScheme: ColorScheme(
+          brightness: isDark ? Brightness.dark : Brightness.light,
+          primary: const Color(0xFF0F7253),
+          onPrimary: Colors.white,
+          secondary: const Color(0xFF0F7253),
+          onSecondary: Colors.white,
+          error: const Color(0xFFBA1A1A),
+          onError: Colors.white,
+          surface: isDark ? const Color(0xFF151E1A) : const Color(0xFFFFFFFF),
+          onSurface: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
+          onSurfaceVariant:
+              isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+        ),
+        scaffoldBackgroundColor:
+            isDark ? const Color(0xFF0B120E) : const Color(0xFFF2F5F3),
+      );
+
   @override
   Widget build(BuildContext context) {
     final scale = _scale(context);
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 600;
+    final parentIsDark = Theme.of(context).brightness == Brightness.dark;
 
-    return BlocProvider(
-      create: (_) => PharmacyLoginBloc(),
+    return Theme(
+      data: scaledTheme(isDark: parentIsDark),
       child: Builder(
         builder: (context) {
           final theme = Theme.of(context);
           final cs = theme.colorScheme;
           final isDark = theme.brightness == Brightness.dark;
 
-          return Scaffold(
-            backgroundColor: isDark
-                ? const Color(0xFF0C1310)
-                : theme.scaffoldBackgroundColor,
+          return BlocProvider(
+            create: (_) => PharmacyLoginBloc(),
+            child: Builder(
+              builder: (context) {
+                return Scaffold(
+                  backgroundColor: isDark
+                      ? const Color(0xFF0C1310)
+                      : theme.scaffoldBackgroundColor,
             body: SafeArea(
               child: BlocListener<PharmacyLoginBloc, PharmacyLoginState>(
                 listener: (context, state) {
                   if (state is PharmacyLoginSuccess) {
+                    // ignore: avoid_print
+                    print('[LOGIN-SCREEN] pharmacy.id=${state.pharmacy.id} pharmacyName=${state.pharmacy.pharmacyName}');
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -68,7 +96,9 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
                     );
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (_) => const PharmacyHomeScreen(),
+                        builder: (_) => PharmacyHomeScreen(
+                          pharmacyId: state.pharmacy.id,
+                        ),
                       ),
                     );
                   } else if (state is PharmacyLoginFailure) {
@@ -154,7 +184,21 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
                             controller: _passwordController,
                             hintText: 'Password',
                             icon: Icons.lock_outline_rounded,
-                            isPassword: true,
+                            obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
                             isDark: isDark,
                             cs: cs,
                           ),
@@ -164,7 +208,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: () => _showForgotPasswordDialog(context, isDark, cs),
                               child: Text(
                                 'Forgot password?',
                                 style: TextStyle(
@@ -262,7 +306,10 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
             ),
           );
         },
-      ),
+        ),
+      );
+    },
+  ),
     );
   }
 
@@ -311,41 +358,151 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
     required IconData icon,
     required bool isDark,
     required ColorScheme cs,
-    bool isPassword = false,
+    bool obscureText = false,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1D322A) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.06),
-        ),
+    final side = BorderSide(
+      color: isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
+    );
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: TextStyle(
+        color: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
+        fontSize: 15,
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        keyboardType: keyboardType,
-        style: TextStyle(color: cs.onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(
-            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-            size: 20,
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+          fontSize: 15,
+        ),
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1A2520) : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: side,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: side,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF0F7253), width: 1.5),
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: isDark ? const Color(0xFF6E9585) : const Color(0xFF6E7A75),
+          size: 22,
+        ),
+        suffixIcon: suffixIcon,
+      ),
+    );
+  }
+
+  void _showForgotPasswordDialog(
+    BuildContext context,
+    bool isDark,
+    ColorScheme cs,
+  ) {
+    final emailCtrl = TextEditingController(text: _emailController.text.trim());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF151E1A) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Reset Password',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
           ),
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter your registered email address and we will send you a link to reset or create your password.',
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              style: TextStyle(color: cs.onSurface, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'pharmacy@email.co.uk',
+                prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F7253),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter your email.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await PharmacyLoginService.instance.sendPasswordResetEmail(email);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Password reset link sent to $email.'),
+                      backgroundColor: const Color(0xFF0F7253),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString().replaceFirst('Exception: ', '')),
+                      backgroundColor: cs.error,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Send Link'),
+          ),
+        ],
       ),
     );
   }

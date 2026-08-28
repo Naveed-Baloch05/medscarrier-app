@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/rider_login/rider_login_bloc.dart';
 import '../bloc/rider_login/rider_login_event.dart';
 import '../bloc/rider_login/rider_login_state.dart';
+import '../core/services/rider_login_service.dart';
 import 'rider_home_screen.dart';
 
 class RiderLoginScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class RiderLoginScreen extends StatefulWidget {
 class _RiderLoginScreenState extends State<RiderLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -25,9 +27,20 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
   }
 
   void _submit(BuildContext context) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter both email and password.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     context.read<RiderLoginBloc>().add(RiderLoginSubmitted(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
+      email: email,
+      password: password,
     ));
   }
 
@@ -36,22 +49,44 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     return (shortestSide / 420).clamp(0.85, 1.1);
   }
 
+  ThemeData scaledTheme({bool isDark = false}) => ThemeData(
+        brightness: isDark ? Brightness.dark : Brightness.light,
+        colorScheme: ColorScheme(
+          brightness: isDark ? Brightness.dark : Brightness.light,
+          primary: const Color(0xFF0F7253),
+          onPrimary: Colors.white,
+          secondary: const Color(0xFF0F7253),
+          onSecondary: Colors.white,
+          error: const Color(0xFFBA1A1A),
+          onError: Colors.white,
+          surface: isDark ? const Color(0xFF151E1A) : const Color(0xFFFFFFFF),
+          onSurface: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
+          onSurfaceVariant:
+              isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+        ),
+        scaffoldBackgroundColor:
+            isDark ? const Color(0xFF0B120E) : const Color(0xFFF2F5F3),
+      );
+
   @override
   Widget build(BuildContext context) {
     final scale = _scale(context);
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 600;
+    final parentIsDark = Theme.of(context).brightness == Brightness.dark;
 
-    return BlocProvider(
-      create: (_) => RiderLoginBloc(),
-      child: Builder(
-        builder: (context) {
-          final theme = Theme.of(context);
-          final cs = theme.colorScheme;
-          final isDark = theme.brightness == Brightness.dark;
+    return Theme(
+      data: scaledTheme(isDark: parentIsDark),
+      child: BlocProvider(
+        create: (_) => RiderLoginBloc(),
+        child: Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            final cs = theme.colorScheme;
+            final isDark = theme.brightness == Brightness.dark;
 
-          return Scaffold(
-            backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
+            return Scaffold(
+              backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
             body: SafeArea(
               child: BlocListener<RiderLoginBloc, RiderLoginState>(
                 listener: (context, state) {
@@ -59,13 +94,11 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Welcome back, ${state.rider.fullName}!'),
-                        backgroundColor: const Color(0xFF0F7253),
+                        backgroundColor: cs.primary,
                       ),
                     );
                     Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => RiderHomeScreen(riderId: state.rider.id),
-                      ),
+                      MaterialPageRoute(builder: (_) => RiderHomeScreen(riderId: state.rider.id)),
                     );
                   } else if (state is RiderLoginFailure) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -94,7 +127,8 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                             width: 60 * scale,
                             height: 60 * scale,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F7253).withValues(alpha: 0.1),
+                              color: const Color(0xFF0F7253)
+                                  .withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -143,7 +177,21 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                             controller: _passwordController,
                             hintText: 'Password',
                             icon: Icons.lock_outline_rounded,
-                            isPassword: true,
+                            obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
                             isDark: isDark,
                             cs: cs,
                           ),
@@ -153,7 +201,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: () => _showForgotPasswordDialog(context, isDark, cs),
                               child: Text(
                                 'Forgot password?',
                                 style: TextStyle(
@@ -175,9 +223,9 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                                 height: 54 * scale,
                                 child: ElevatedButton(
                                   onPressed: isLoading ? null : () => _submit(context),
-                                   style: ElevatedButton.styleFrom(
+                                  style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF0F7253),
-                                    foregroundColor: Colors.white,
+                                    foregroundColor: isDark ? const Color(0xFF0C1310) : Colors.white,
                                     disabledBackgroundColor: const Color(0xFF0F7253).withValues(alpha: 0.5),
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
@@ -220,10 +268,10 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                               ),
                               GestureDetector(
                                 onTap: () => Navigator.pop(context),
-                                child: Text(
+                                child: const Text(
                                   'Sign up',
                                   style: TextStyle(
-                                    color: const Color(0xFF0F7253),
+                                    color: Color(0xFF0F7253),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13.5,
                                   ),
@@ -241,6 +289,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -290,39 +339,151 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     required IconData icon,
     required bool isDark,
     required ColorScheme cs,
-    bool isPassword = false,
+    bool obscureText = false,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1D322A) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-        ),
+    final side = BorderSide(
+      color: isDark ? const Color(0xFF1D322A) : const Color(0xFFE2E8E5),
+    );
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: TextStyle(
+        color: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
+        fontSize: 15,
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        keyboardType: keyboardType,
-        style: TextStyle(color: cs.onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(
-            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-            size: 20,
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
+          fontSize: 15,
+        ),
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1A2520) : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: side,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: side,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF0F7253), width: 1.5),
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: isDark ? const Color(0xFF6E9585) : const Color(0xFF6E7A75),
+          size: 22,
+        ),
+        suffixIcon: suffixIcon,
+      ),
+    );
+  }
+
+  void _showForgotPasswordDialog(
+    BuildContext context,
+    bool isDark,
+    ColorScheme cs,
+  ) {
+    final emailCtrl = TextEditingController(text: _emailController.text.trim());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF151E1A) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Reset Password',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
           ),
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter your registered email address and we will send you a link to reset your password.',
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              style: TextStyle(color: cs.onSurface, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'you@email.co.uk',
+                prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F7253),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter your email.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await RiderLoginService.instance.sendPasswordResetEmail(email);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Password reset link sent to $email.'),
+                      backgroundColor: const Color(0xFF0F7253),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString().replaceFirst('Exception: ', '')),
+                      backgroundColor: cs.error,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Send Link'),
+          ),
+        ],
       ),
     );
   }

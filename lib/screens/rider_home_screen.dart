@@ -50,9 +50,14 @@ class MedsCarrierRiderApp extends StatelessWidget {
 }
 
 class RiderHomeScreen extends StatefulWidget {
-  const RiderHomeScreen({super.key, required this.riderId});
+  const RiderHomeScreen({
+    super.key,
+    required this.riderId,
+    this.bloc,
+  });
 
   final String riderId;
+  final RiderHomeBloc? bloc;
 
   @override
   State<RiderHomeScreen> createState() => _RiderHomeScreenState();
@@ -60,16 +65,24 @@ class RiderHomeScreen extends StatefulWidget {
 
 class _RiderHomeScreenState extends State<RiderHomeScreen> {
   late final RiderHomeBloc _bloc;
+  bool _internalBloc = false;
 
   @override
   void initState() {
     super.initState();
-    _bloc = RiderHomeBloc()..add(LoadRiderHome(widget.riderId));
+    if (widget.bloc != null) {
+      _bloc = widget.bloc!;
+    } else {
+      _internalBloc = true;
+      _bloc = RiderHomeBloc()..add(LoadRiderHome(widget.riderId));
+    }
   }
 
   @override
   void dispose() {
-    _bloc.close();
+    if (_internalBloc) {
+      _bloc.close();
+    }
     super.dispose();
   }
 
@@ -793,7 +806,10 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const RiderMapScreen(),
+                          builder: (_) => RiderMapScreen(
+                            riderId: widget.riderId,
+                            initialOrderId: order.id,
+                          ),
                         ),
                       );
                     },
@@ -943,17 +959,35 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         if (index == 0) return;
         if (index == 1) {
           Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const RiderMapScreen()));
+              MaterialPageRoute(builder: (_) => RiderMapScreen(
+                riderId: widget.riderId,
+              )));
           return;
         }
         if (index == 2) {
+          final homeState = context.read<RiderHomeBloc>().state;
+          List<OrderModel>? initialOrders;
+          if (homeState is RiderHomeLoaded) {
+            initialOrders = homeState.orders;
+          }
           Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const RiderDeliveriesScreen()));
+              MaterialPageRoute(builder: (_) => RiderDeliveriesScreen(
+                riderId: widget.riderId,
+                initialOrders: initialOrders,
+              )));
           return;
         }
         if (index == 3) {
+          final homeState = context.read<RiderHomeBloc>().state;
+          Map<String, dynamic>? initialData;
+          if (homeState is RiderHomeLoaded) {
+            initialData = homeState.rider.toJson();
+          }
           Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const RiderProfileScreen()));
+              MaterialPageRoute(builder: (_) => RiderProfileScreen(
+                riderId: widget.riderId,
+                initialData: initialData,
+              )));
         }
       },
       items: const [

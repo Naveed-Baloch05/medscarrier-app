@@ -1,35 +1,36 @@
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../bloc/pharmacy_profile/pharmacy_profile_bloc.dart';
+import '../bloc/pharmacy_profile/pharmacy_profile_event.dart';
+import '../bloc/pharmacy_profile/pharmacy_profile_state.dart';
 import '../bloc/theme/theme_bloc.dart';
 import '../bloc/theme/theme_event.dart';
 import '../bloc/theme/theme_state.dart';
 
 class PharmacyProfileScreen extends StatefulWidget {
-  const PharmacyProfileScreen({super.key});
+  const PharmacyProfileScreen({super.key, required this.pharmacyId});
+
+  final String pharmacyId;
 
   @override
   State<PharmacyProfileScreen> createState() => _PharmacyProfileScreenState();
 }
 
 class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
-  String pharmacyName = 'MedCare Pharmacy';
-  String pharmacistName = 'Naveed Baloch';
-  String phone = '+92 300 1234567';
-  String email = 'pharmacy@example.com';
-  String address = 'Main Market, Pakistan';
-  String licenseNumber = 'PH-2026-00125';
-  String openingTime = '09:00 AM';
-  String closingTime = '10:00 PM';
-
-  bool notificationsEnabled = true;
-  bool pharmacyOpen = true;
-
-  File? _profileImage;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<PharmacyProfileBloc>().add(
+          LoadPharmacyProfile(widget.pharmacyId),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,31 +51,95 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
-            onPressed: () => setState(() {}),
+            onPressed: () => context.read<PharmacyProfileBloc>().add(
+                  LoadPharmacyProfile(widget.pharmacyId),
+                ),
           ),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-          children: [
-            _buildProfileHeader(context, cs, isDark),
-            const SizedBox(height: 20),
-            _sectionTitle('Pharmacy Information', cs),
-            const SizedBox(height: 12),
-            _buildInformationCard(context, cs, isDark),
-            const SizedBox(height: 22),
-            _sectionTitle('Business Details', cs),
-            const SizedBox(height: 12),
-            _buildBusinessCard(context, cs, isDark),
-            const SizedBox(height: 22),
-            _sectionTitle('Account', cs),
-            const SizedBox(height: 12),
-            _buildAccountCard(context, cs, isDark),
-            const SizedBox(height: 22),
-            _buildLogoutButton(cs, isDark),
-          ],
-        ),
+      body: BlocConsumer<PharmacyProfileBloc, PharmacyProfileState>(
+        listener: (context, state) {
+          if (state is PharmacyProfileOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+          if (state is PharmacyProfileError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is PharmacyProfileLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state is PharmacyProfileError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline_rounded, size: 50),
+                    const SizedBox(height: 16),
+                    Text(state.message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.read<PharmacyProfileBloc>().add(
+                            LoadPharmacyProfile(widget.pharmacyId),
+                          ),
+                      child: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final loaded = state is PharmacyProfileLoaded
+              ? state
+              : state is PharmacyProfileOperationSuccess
+                  ? PharmacyProfileLoaded(data: state.data)
+                  : state is PharmacyProfileUpdating
+                      ? PharmacyProfileLoaded(data: state.data)
+                      : null;
+
+          if (loaded == null) return const SizedBox();
+
+          final isUpdating = state is PharmacyProfileUpdating;
+
+          return Stack(
+            children: [
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+                children: [
+                  _buildProfileHeader(context, cs, isDark, loaded),
+                  const SizedBox(height: 20),
+                  _sectionTitle('Pharmacy Information', cs),
+                  const SizedBox(height: 12),
+                  _buildInformationCard(context, cs, isDark, loaded),
+                  const SizedBox(height: 22),
+                  _sectionTitle('Business Details', cs),
+                  const SizedBox(height: 12),
+                  _buildBusinessCard(context, cs, isDark, loaded, isUpdating),
+                  const SizedBox(height: 22),
+                  _sectionTitle('Account', cs),
+                  const SizedBox(height: 12),
+                  _buildAccountCard(context, cs, isDark, loaded),
+                  const SizedBox(height: 22),
+                  _buildLogoutButton(cs, isDark),
+                ],
+              ),
+              if (isUpdating)
+                Container(
+                  color: Colors.black26,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -83,7 +148,10 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
     return Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface));
   }
 
-  Widget _buildProfileHeader(BuildContext context, ColorScheme cs, bool isDark) {
+  Widget _buildProfileHeader(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state) {
+    final profilePhotoUrl = state.profilePhotoUrl;
+    final hasLocalImage = _localProfileImage != null;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -105,9 +173,11 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                     shape: BoxShape.circle,
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: _profileImage != null
-                      ? Image.file(_profileImage!, fit: BoxFit.cover)
-                      : Icon(Icons.local_pharmacy_outlined, size: 38, color: cs.onSurfaceVariant),
+                  child: hasLocalImage
+                      ? Image.file(_localProfileImage!, fit: BoxFit.cover)
+                      : profilePhotoUrl != null && profilePhotoUrl.isNotEmpty
+                          ? Image.network(profilePhotoUrl, fit: BoxFit.cover)
+                          : Icon(Icons.local_pharmacy_outlined, size: 38, color: cs.onSurfaceVariant),
                 ),
                 Positioned(
                   bottom: 0,
@@ -127,14 +197,21 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Text(pharmacyName, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
+          Text(
+            state.pharmacyName.isEmpty ? 'Pharmacy' : state.pharmacyName,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface),
+          ),
           const SizedBox(height: 5),
-          Text(pharmacistName, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+          Text(
+            state.contactName.isEmpty ? 'Owner' : state.contactName,
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+          ),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: pharmacyOpen
+              color: state.pharmacyOpen
                   ? (isDark ? const Color(0xFF15301D) : Colors.green.shade50)
                   : (isDark ? const Color(0xFF2D1B1B) : Colors.red.shade50),
               borderRadius: BorderRadius.circular(20),
@@ -146,17 +223,17 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: pharmacyOpen ? Colors.green.shade600 : Colors.red.shade600,
+                    color: state.pharmacyOpen ? Colors.green.shade600 : Colors.red.shade600,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 7),
                 Text(
-                  pharmacyOpen ? 'Pharmacy Open' : 'Pharmacy Closed',
+                  state.pharmacyOpen ? 'Pharmacy Open' : 'Pharmacy Closed',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: pharmacyOpen ? Colors.green.shade700 : Colors.red.shade700,
+                    color: state.pharmacyOpen ? Colors.green.shade700 : Colors.red.shade700,
                   ),
                 ),
               ],
@@ -167,7 +244,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
             width: double.infinity,
             height: 46,
             child: OutlinedButton.icon(
-              onPressed: _showEditProfile,
+              onPressed: () => _showEditProfile(state),
               icon: const Icon(Icons.edit_outlined, size: 18),
               label: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
@@ -182,42 +259,46 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
     );
   }
 
-  Widget _buildInformationCard(BuildContext context, ColorScheme cs, bool isDark) {
+  Widget _buildInformationCard(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state) {
     return _sectionCard(context, cs, isDark, children: [
-      _informationRow(icon: Icons.person_outline, title: 'Pharmacist', value: pharmacistName, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.person_outline, title: 'Pharmacist', value: state.contactName, cs: cs, isDark: isDark),
       _divider(isDark),
-      _informationRow(icon: Icons.phone_outlined, title: 'Phone', value: phone, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.phone_outlined, title: 'Phone', value: state.phone, cs: cs, isDark: isDark),
       _divider(isDark),
-      _informationRow(icon: Icons.email_outlined, title: 'Email', value: email, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.email_outlined, title: 'Email', value: state.email, cs: cs, isDark: isDark),
       _divider(isDark),
-      _informationRow(icon: Icons.location_on_outlined, title: 'Address', value: address, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.location_on_outlined, title: 'Address', value: state.businessAddress, cs: cs, isDark: isDark),
     ]);
   }
 
-  Widget _buildBusinessCard(BuildContext context, ColorScheme cs, bool isDark) {
+  Widget _buildBusinessCard(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state, bool isUpdating) {
     return _sectionCard(context, cs, isDark, children: [
-      _informationRow(icon: Icons.badge_outlined, title: 'License Number', value: licenseNumber, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.badge_outlined, title: 'License Number', value: state.gphcNumber, cs: cs, isDark: isDark),
       _divider(isDark),
-      _informationRow(icon: Icons.access_time_outlined, title: 'Opening Time', value: openingTime, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.access_time_outlined, title: 'Opening Time', value: state.openingTime, cs: cs, isDark: isDark),
       _divider(isDark),
-      _informationRow(icon: Icons.access_time_filled_outlined, title: 'Closing Time', value: closingTime, cs: cs, isDark: isDark),
+      _informationRow(icon: Icons.access_time_filled_outlined, title: 'Closing Time', value: state.closingTime, cs: cs, isDark: isDark),
       _divider(isDark),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         secondary: Icon(Icons.storefront_outlined, color: cs.onSurfaceVariant),
         title: Text('Pharmacy Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
         subtitle: Text(
-          pharmacyOpen ? 'Currently open' : 'Currently closed',
+          state.pharmacyOpen ? 'Currently open' : 'Currently closed',
           style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
-        value: pharmacyOpen,
+        value: state.pharmacyOpen,
         activeThumbColor: const Color(0xFF0F7253),
-        onChanged: (value) => setState(() => pharmacyOpen = value),
+        onChanged: isUpdating
+            ? null
+            : (value) => context.read<PharmacyProfileBloc>().add(
+                  PharmacyOpenToggled(value),
+                ),
       ),
     ]);
   }
 
-  Widget _buildAccountCard(BuildContext context, ColorScheme cs, bool isDark) {
+  Widget _buildAccountCard(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state) {
     return _sectionCard(context, cs, isDark, children: [
       ListTile(
         contentPadding: EdgeInsets.zero,
@@ -233,12 +314,24 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
         secondary: Icon(Icons.notifications_none_outlined, color: cs.onSurfaceVariant),
         title: Text('Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
         subtitle: Text(
-          notificationsEnabled ? 'Notifications are enabled' : 'Notifications are disabled',
+          state.notificationsEnabled ? 'Notifications are enabled' : 'Notifications are disabled',
           style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
-        value: notificationsEnabled,
+        value: state.notificationsEnabled,
         activeThumbColor: const Color(0xFF0F7253),
-        onChanged: (value) => setState(() => notificationsEnabled = value),
+        onChanged: (value) => context.read<PharmacyProfileBloc>().add(
+              PharmacyProfileUpdated(
+                pharmacyName: state.pharmacyName,
+                contactName: state.contactName,
+                phone: state.phone,
+                email: state.email,
+                businessAddress: state.businessAddress,
+                gphcNumber: state.gphcNumber,
+                openingTime: state.openingTime,
+                closingTime: state.closingTime,
+                notificationsEnabled: value,
+              ),
+            ),
       ),
       _divider(isDark),
       BlocBuilder<ThemeBloc, ThemeState>(
@@ -304,7 +397,10 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
               children: [
                 Text(title, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
                 const SizedBox(height: 3),
-                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                Text(
+                  value.isEmpty ? '-' : value,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface),
+                ),
               ],
             ),
           ),
@@ -334,14 +430,16 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
     );
   }
 
-  void _showEditProfile() {
+  void _showEditProfile(PharmacyProfileLoaded state) {
     final cs = Theme.of(context).colorScheme;
-    final pharmacyCtrl = TextEditingController(text: pharmacyName);
-    final pharmacistCtrl = TextEditingController(text: pharmacistName);
-    final phoneCtrl = TextEditingController(text: phone);
-    final emailCtrl = TextEditingController(text: email);
-    final addressCtrl = TextEditingController(text: address);
-    final licenseCtrl = TextEditingController(text: licenseNumber);
+    final pharmacyCtrl = TextEditingController(text: state.pharmacyName);
+    final pharmacistCtrl = TextEditingController(text: state.contactName);
+    final phoneCtrl = TextEditingController(text: state.phone);
+    final emailCtrl = TextEditingController(text: state.email);
+    final addressCtrl = TextEditingController(text: state.businessAddress);
+    final licenseCtrl = TextEditingController(text: state.gphcNumber);
+    final openingCtrl = TextEditingController(text: state.openingTime);
+    final closingCtrl = TextEditingController(text: state.closingTime);
 
     showModalBottomSheet(
       context: context,
@@ -379,22 +477,29 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                   _profileField(controller: addressCtrl, label: 'Address', icon: Icons.location_on_outlined, context: context),
                   const SizedBox(height: 13),
                   _profileField(controller: licenseCtrl, label: 'License Number', icon: Icons.badge_outlined, context: context),
+                  const SizedBox(height: 13),
+                  _profileField(controller: openingCtrl, label: 'Opening Time', icon: Icons.access_time_outlined, context: context),
+                  const SizedBox(height: 13),
+                  _profileField(controller: closingCtrl, label: 'Closing Time', icon: Icons.access_time_filled_outlined, context: context),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
                       onPressed: () {
-                        setState(() {
-                          pharmacyName = pharmacyCtrl.text.trim();
-                          pharmacistName = pharmacistCtrl.text.trim();
-                          phone = phoneCtrl.text.trim();
-                          email = emailCtrl.text.trim();
-                          address = addressCtrl.text.trim();
-                          licenseNumber = licenseCtrl.text.trim();
-                        });
+                        context.read<PharmacyProfileBloc>().add(
+                              PharmacyProfileUpdated(
+                                pharmacyName: pharmacyCtrl.text.trim(),
+                                contactName: pharmacistCtrl.text.trim(),
+                                phone: phoneCtrl.text.trim(),
+                                email: emailCtrl.text.trim(),
+                                businessAddress: addressCtrl.text.trim(),
+                                gphcNumber: licenseCtrl.text.trim(),
+                                openingTime: openingCtrl.text.trim(),
+                                closingTime: closingCtrl.text.trim(),
+                              ),
+                            );
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F7253),
@@ -472,11 +577,24 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                     onPressed: () {
                       if (newCtrl.text.isEmpty || confirmCtrl.text.isEmpty) return;
                       if (newCtrl.text != confirmCtrl.text) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Passwords do not match.')),
+                        );
                         return;
                       }
+                      if (newCtrl.text.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Password must be at least 6 characters.')),
+                        );
+                        return;
+                      }
+                      context.read<PharmacyProfileBloc>().add(
+                            PharmacyPasswordChanged(
+                              currentPassword: currentCtrl.text,
+                              newPassword: newCtrl.text,
+                            ),
+                          );
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated.')));
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F7253),
@@ -533,11 +651,20 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
               child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant)),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Logout functionality will be connected later.')),
-                );
+                try {
+                  await FirebaseAuth.instance.signOut();
+                  if (mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Logout failed. Please try again.')),
+                    );
+                  }
+                }
               },
               child: Text('Logout', style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w600)),
             ),
@@ -546,6 +673,8 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
       },
     );
   }
+
+  File? _localProfileImage;
 
   void _showImageOptions() {
     final cs = Theme.of(context).colorScheme;
@@ -607,7 +736,7 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                     _pickImage(ImageSource.gallery);
                   },
                 ),
-                if (_profileImage != null) ...[
+                if (_localProfileImage != null) ...[
                   const SizedBox(height: 8),
                   ListTile(
                     leading: Container(
@@ -622,8 +751,10 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                     subtitle: Text('Delete profile photo', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                     onTap: () {
                       Navigator.pop(ctx);
-                      setState(() => _profileImage = null);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo removed.')));
+                      setState(() => _localProfileImage = null);
+                      context.read<PharmacyProfileBloc>().add(
+                            const PharmacyProfilePhotoRemoved(),
+                          );
                     },
                   ),
                 ],
@@ -638,9 +769,12 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
   Future<void> _pickImage(ImageSource source) async {
     final picked = await _picker.pickImage(source: source, maxWidth: 512, maxHeight: 512, imageQuality: 80);
     if (picked != null) {
-      setState(() => _profileImage = File(picked.path));
+      final file = File(picked.path);
+      setState(() => _localProfileImage = file);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
+        context.read<PharmacyProfileBloc>().add(
+              PharmacyProfilePhotoChanged(file),
+            );
       }
     }
   }

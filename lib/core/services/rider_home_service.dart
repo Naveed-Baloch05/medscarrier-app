@@ -10,24 +10,61 @@ class RiderHomeService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<RiderModel?> getRiderProfile(String riderId) async {
+    if (riderId.trim().isEmpty) return null;
     try {
-      final doc = await _firestore.collection('riders').doc(riderId).get();
-      if (!doc.exists || doc.data() == null) return null;
+      DocumentSnapshot<Map<String, dynamic>>? doc;
+
+      final directDoc =
+          await _firestore.collection('riders').doc(riderId).get();
+      if (directDoc.exists && directDoc.data() != null) {
+        doc = directDoc;
+      }
+
+      if (doc == null) {
+        final uidQuery = await _firestore
+            .collection('riders')
+            .where('uid', isEqualTo: riderId)
+            .limit(1)
+            .get();
+        if (uidQuery.docs.isNotEmpty) {
+          doc = uidQuery.docs.first;
+        }
+      }
+
+      if (doc == null) {
+        final idQuery = await _firestore
+            .collection('riders')
+            .where('id', isEqualTo: riderId)
+            .limit(1)
+            .get();
+        if (idQuery.docs.isNotEmpty) {
+          doc = idQuery.docs.first;
+        }
+      }
+
+      if (doc == null || !doc.exists || doc.data() == null) return null;
 
       final data = doc.data()!;
+      final resolvedId = (data['id'] as String?)?.isNotEmpty == true
+          ? (data['id'] as String)
+          : ((data['uid'] as String?)?.isNotEmpty == true
+              ? (data['uid'] as String)
+              : (doc.id.isNotEmpty ? doc.id : riderId));
+
       return RiderModel(
-        id: doc.id,
+        id: resolvedId,
         fullName: data['fullName'] as String? ?? data['name'] as String? ?? '',
         email: data['email'] as String? ?? '',
         phone: data['phone'] as String? ?? '',
         vehicleType: data['vehicleType'] as String? ?? '',
-        vehicleReg:
-            data['vehicleReg'] as String? ??
+        vehicleReg: data['vehicleReg'] as String? ??
             data['vehicleRegistrationNumber'] as String? ??
             '',
         online: data['online'] as bool? ?? false,
         active: data['active'] as bool? ?? true,
-        location: data['location'] as Map<String, dynamic>?,
+        location: data['location'] is Map
+            ? Map<String, dynamic>.from(data['location'] as Map)
+            : null,
         deliveries: data['deliveries'] as int? ?? 0,
         currentOrder: data['currentOrder'] as String?,
         lastSeen: _parseTimestamp(data['lastSeen']),
@@ -70,7 +107,9 @@ class RiderHomeService {
             '',
         online: data['online'] as bool? ?? false,
         active: data['active'] as bool? ?? true,
-        location: data['location'] as Map<String, dynamic>?,
+        location: data['location'] is Map
+            ? Map<String, dynamic>.from(data['location'] as Map)
+            : null,
         deliveries: data['deliveries'] as int? ?? 0,
         currentOrder: data['currentOrder'] as String?,
         lastSeen: _parseTimestamp(data['lastSeen']),

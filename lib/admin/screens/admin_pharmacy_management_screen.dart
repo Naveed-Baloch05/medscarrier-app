@@ -4,6 +4,7 @@ import '../../bloc/admin_pharmacy/admin_pharmacy_bloc.dart';
 import '../../bloc/admin_pharmacy/admin_pharmacy_event.dart';
 import '../../bloc/admin_pharmacy/admin_pharmacy_state.dart';
 import '../../models/pharmacy_application_model.dart';
+import '../../widgets/document_preview_dialog.dart';
 
 class AdminPharmacyManagementScreen extends StatefulWidget {
   const AdminPharmacyManagementScreen({
@@ -2392,9 +2393,13 @@ class _AdminPharmacyManagementScreenState
                   _bottomDetail('Email', app.email, isDark),
                   _bottomDetail('Address', app.businessAddress, isDark),
                   _bottomDetail('GPhC Number', app.gphcNumber, isDark),
-                  if (app.licenseDocumentUrl != null &&
-                      app.licenseDocumentUrl!.isNotEmpty)
-                    _bottomDetail('License Document', app.licenseDocumentUrl!, isDark),
+                  const SizedBox(height: 12),
+                  DocumentImageThumbnail(
+                    title: 'GPhC License Document',
+                    imageUrl: app.licenseDocumentUrl,
+                    height: 150,
+                  ),
+                  const SizedBox(height: 12),
                   _bottomDetail(
                     'Submitted',
                     app.submittedAt != null

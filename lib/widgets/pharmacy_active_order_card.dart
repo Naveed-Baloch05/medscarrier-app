@@ -67,25 +67,32 @@ class PharmacyActiveOrderCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      orderId,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF0F7253),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          orderId,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F7253),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      orderTime,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurfaceVariant,
+                      const SizedBox(width: 8),
+                      Text(
+                        orderTime,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,

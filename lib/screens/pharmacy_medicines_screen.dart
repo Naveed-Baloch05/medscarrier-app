@@ -1,43 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../bloc/pharmacy_medicines/pharmacy_medicines_bloc.dart';
+import '../bloc/pharmacy_medicines/pharmacy_medicines_event.dart';
+import '../bloc/pharmacy_medicines/pharmacy_medicines_state.dart';
+import '../models/medicine_model.dart';
 import '../widgets/pharmacy_medicine_card.dart';
 import '../widgets/pharmacy_medicine_options.dart';
 
 class PharmacyMedicinesScreen extends StatefulWidget {
-  const PharmacyMedicinesScreen({super.key});
+  const PharmacyMedicinesScreen({super.key, required this.pharmacyId});
+
+  final String pharmacyId;
 
   @override
-  State<PharmacyMedicinesScreen> createState() => _PharmacyMedicinesScreenState();
+  State<PharmacyMedicinesScreen> createState() =>
+      _PharmacyMedicinesScreenState();
 }
 
 class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'All';
-
-  final List<Map<String, dynamic>> _medicines = [
-    {'name': 'Paracetamol 500mg', 'genericName': 'Paracetamol', 'category': 'OTC', 'stock': 120, 'price': 5.50, 'prescription': false, 'lowStockThreshold': 10},
-    {'name': 'Amoxicillin 500mg', 'genericName': 'Amoxicillin', 'category': 'Prescription', 'stock': 45, 'price': 12.00, 'prescription': true, 'lowStockThreshold': 15},
-    {'name': 'Ibuprofen 400mg', 'genericName': 'Ibuprofen', 'category': 'OTC', 'stock': 75, 'price': 7.25, 'prescription': false, 'lowStockThreshold': 10},
-    {'name': 'Cetirizine 10mg', 'genericName': 'Cetirizine', 'category': 'OTC', 'stock': 8, 'price': 4.50, 'prescription': false, 'lowStockThreshold': 12},
-    {'name': 'Metformin 500mg', 'genericName': 'Metformin', 'category': 'Prescription', 'stock': 32, 'price': 9.75, 'prescription': true, 'lowStockThreshold': 10},
-    {'name': 'Azithromycin 250mg', 'genericName': 'Azithromycin', 'category': 'Prescription', 'stock': 5, 'price': 15.50, 'prescription': true, 'lowStockThreshold': 8},
-  ];
-
-  List<Map<String, dynamic>> get _filteredMedicines {
-    final search = _searchController.text.toLowerCase().trim();
-    return _medicines.where((medicine) {
-      final medicineName = medicine['name'].toString().toLowerCase();
-      final genericName = medicine['genericName'].toString().toLowerCase();
-      final matchesSearch = medicineName.contains(search) || genericName.contains(search);
-      final stock = medicine['stock'] as int;
-      final threshold = medicine['lowStockThreshold'] as int? ?? 10;
-      final isLowStock = stock <= threshold;
-      final matchesCategory = _selectedCategory == 'All' ||
-          medicine['category'] == _selectedCategory ||
-          (_selectedCategory == 'Low Stock' && isLowStock);
-      return matchesSearch && matchesCategory;
-    }).toList();
-  }
 
   @override
   void dispose() {
@@ -45,27 +28,43 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
     super.dispose();
   }
 
+  List<MedicineModel> _filteredMedicines(List<MedicineModel> medicines) {
+    final search = _searchController.text.toLowerCase().trim();
+    return medicines.where((medicine) {
+      final matchesSearch = medicine.name.toLowerCase().contains(search) ||
+          medicine.genericName.toLowerCase().contains(search);
+      final matchesCategory = _selectedCategory == 'All' ||
+          medicine.category == _selectedCategory ||
+          (_selectedCategory == 'Low Stock' && medicine.isLowStock);
+      return matchesSearch && matchesCategory;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final medicines = _filteredMedicines;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
+      backgroundColor:
+          isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
+        backgroundColor:
+            isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
           'Medicines',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface),
+          style: TextStyle(
+              fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface),
         ),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
-            onPressed: () => setState(() {}),
+            onPressed: () => context
+                .read<PharmacyMedicinesBloc>()
+                .add(const PharmacyMedicinesRefreshed()),
           ),
           IconButton(
             onPressed: () => _showMedicineForm(context),
@@ -80,100 +79,162 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
           child: Column(
             children: [
               const SizedBox(height: 8),
-
-              // SEARCH
-              Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200,
-                  ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  style: TextStyle(color: cs.onSurface),
-                  decoration: InputDecoration(
-                    hintText: 'Search medicines...',
-                    hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-                    prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {});
-                            },
-                            icon: Icon(Icons.close_rounded, size: 19, color: cs.onSurfaceVariant),
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                ),
-              ),
+              _buildSearchBar(context, cs, isDark),
               const SizedBox(height: 18),
-
-              // FILTER
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _categoryButton('All', isDark, cs),
-                    _categoryButton('OTC', isDark, cs),
-                    _categoryButton('Prescription', isDark, cs),
-                    _categoryButton('Low Stock', isDark, cs),
-                  ],
-                ),
-              ),
+              _buildCategoryFilter(isDark, cs),
               const SizedBox(height: 18),
-
-              // INVENTORY SUMMARY
-              Row(
-                children: [
-                  Text(
-                    'Medicine Inventory',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${medicines.length} items',
-                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // MEDICINE LIST
               Expanded(
-                child: medicines.isEmpty
-                    ? _buildEmptyState(context)
-                    : ListView.separated(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.only(bottom: 20),
-                        itemCount: medicines.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final medicine = medicines[index];
-                          return PharmacyMedicineCard(
-                            medicine: medicine,
-                            onOptionsTap: () {
-                              PharmacyMedicineOptions.show(
-                                context: context,
-                                medicine: medicine,
-                                onEdit: () => _showMedicineForm(context, existing: medicine),
-                                onDelete: () => _deleteMedicine(medicine),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                child: BlocBuilder<PharmacyMedicinesBloc,
+                    PharmacyMedicinesState>(
+                  builder: (context, state) {
+                    if (state is PharmacyMedicinesLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (state is PharmacyMedicinesError) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                size: 50),
+                            const SizedBox(height: 16),
+                            Text(
+                              state.message,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                context.read<PharmacyMedicinesBloc>().add(
+                                      LoadPharmacyMedicines(
+                                          widget.pharmacyId),
+                                    );
+                              },
+                              child: const Text('Try Again'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (state is PharmacyMedicinesLoaded) {
+                      final medicines = _filteredMedicines(state.medicines);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Medicine Inventory',
+                                style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.onSurface),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${medicines.length} items',
+                                style: TextStyle(
+                                    fontSize: 13, color: cs.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: medicines.isEmpty
+                                ? _buildEmptyState(context)
+                                : ListView.separated(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
+                                    padding:
+                                        const EdgeInsets.only(bottom: 20),
+                                    itemCount: medicines.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 12),
+                                    itemBuilder: (context, index) {
+                                      final medicine = medicines[index];
+                                      return PharmacyMedicineCard(
+                                        medicine: medicine,
+                                        onOptionsTap: () {
+                                          PharmacyMedicineOptions.show(
+                                            context: context,
+                                            medicine: medicine,
+                                            onEdit: () =>
+                                                _showMedicineForm(
+                                                    context,
+                                                    existing: medicine),
+                                            onDelete: () =>
+                                                _deleteMedicine(medicine),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return const SizedBox();
+                  },
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context, ColorScheme cs, bool isDark) {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200,
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
+        style: TextStyle(color: cs.onSurface),
+        decoration: InputDecoration(
+          hintText: 'Search medicines...',
+          hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+          prefixIcon:
+              Icon(Icons.search_rounded, color: cs.onSurfaceVariant),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {});
+                  },
+                  icon: Icon(Icons.close_rounded,
+                      size: 19, color: cs.onSurfaceVariant),
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilter(bool isDark, ColorScheme cs) {
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _categoryButton('All', isDark, cs),
+          _categoryButton('OTC', isDark, cs),
+          _categoryButton('Prescription', isDark, cs),
+          _categoryButton('Low Stock', isDark, cs),
+        ],
       ),
     );
   }
@@ -187,10 +248,14 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF0F7253) : (isDark ? const Color(0xFF131D19) : Colors.white),
+            color: isSelected
+                ? const Color(0xFF0F7253)
+                : (isDark ? const Color(0xFF131D19) : Colors.white),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? const Color(0xFF0F7253) : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
+              color: isSelected
+                  ? const Color(0xFF0F7253)
+                  : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade200),
             ),
           ),
           child: Center(
@@ -223,10 +288,15 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
               color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.medication_outlined, size: 38, color: cs.onSurfaceVariant),
+            child: Icon(Icons.medication_outlined,
+                size: 38, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 18),
-          Text('No medicines found', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface)),
+          Text('No medicines found',
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface)),
           const SizedBox(height: 7),
           Text(
             'Try changing your search or category.',
@@ -238,25 +308,33 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
     );
   }
 
-  void _deleteMedicine(Map<String, dynamic> medicine) {
-    setState(() => _medicines.remove(medicine));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Medicine removed.')));
+  void _deleteMedicine(MedicineModel medicine) {
+    context.read<PharmacyMedicinesBloc>().add(
+          PharmacyMedicineDeleted(medicine.id),
+        );
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medicine removed.')));
   }
 
-  void _showMedicineForm(BuildContext context, {Map<String, dynamic>? existing}) {
+  void _showMedicineForm(BuildContext context, {MedicineModel? existing}) {
     final bool isEditing = existing != null;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final nameCtrl = TextEditingController(text: isEditing ? existing['name'] : '');
-    final genericCtrl = TextEditingController(text: isEditing ? existing['genericName'] : '');
-    final stockCtrl = TextEditingController(text: isEditing ? '${existing['stock']}' : '');
-    final priceCtrl = TextEditingController(text: isEditing ? (existing['price'] as num).toStringAsFixed(2) : '');
-    final lowStockCtrl = TextEditingController(text: isEditing ? '${existing['lowStockThreshold'] ?? 10}' : '10');
+    final nameCtrl =
+        TextEditingController(text: isEditing ? existing.name : '');
+    final genericCtrl =
+        TextEditingController(text: isEditing ? existing.genericName : '');
+    final stockCtrl =
+        TextEditingController(text: isEditing ? '${existing.stock}' : '');
+    final priceCtrl = TextEditingController(
+        text: isEditing ? existing.price.toStringAsFixed(2) : '');
+    final lowStockCtrl = TextEditingController(
+        text: isEditing ? '${existing.lowStockThreshold}' : '10');
     final stockAdjustmentCtrl = TextEditingController();
     String stockAction = 'Add Stock';
-    String category = isEditing ? existing['category'] : 'OTC';
-    bool prescription = isEditing ? existing['prescription'] : false;
+    String category = isEditing ? existing.category : 'OTC';
+    bool prescription = isEditing ? existing.prescription : false;
     final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
@@ -271,7 +349,8 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
           builder: (ctx, setSheetState) {
             return SafeArea(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+                padding: EdgeInsets.fromLTRB(
+                    24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
                 child: Form(
                   key: formKey,
                   child: SingleChildScrollView(
@@ -292,79 +371,163 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                         const SizedBox(height: 20),
                         Text(
                           isEditing ? 'Edit Medicine' : 'Add Medicine',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface),
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface),
                         ),
                         const SizedBox(height: 20),
-                        _formField(controller: nameCtrl, hint: 'Medicine name', icon: Icons.medication_outlined, context: context,
-                            validator: (v) { if (v == null || v.trim().isEmpty) return 'Please enter medicine name'; return null; }),
+                        _formField(
+                            controller: nameCtrl,
+                            hint: 'Medicine name',
+                            icon: Icons.medication_outlined,
+                            context: context,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Please enter medicine name';
+                              }
+                              return null;
+                            }),
                         const SizedBox(height: 14),
-                        _formField(controller: genericCtrl, hint: 'Generic name', icon: Icons.science_outlined, context: context,
-                            validator: (v) { if (v == null || v.trim().isEmpty) return 'Please enter generic name'; return null; }),
+                        _formField(
+                            controller: genericCtrl,
+                            hint: 'Generic name',
+                            icon: Icons.science_outlined,
+                            context: context,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Please enter generic name';
+                              }
+                              return null;
+                            }),
                         const SizedBox(height: 14),
                         Row(
                           children: [
                             Expanded(
-                              child: _formField(controller: stockCtrl, hint: isEditing ? 'Current Stock' : 'Initial Stock', icon: Icons.inventory_2_outlined, context: context,
+                              child: _formField(
+                                  controller: stockCtrl,
+                                  hint: isEditing
+                                      ? 'Current Stock'
+                                      : 'Initial Stock',
+                                  icon: Icons.inventory_2_outlined,
+                                  context: context,
                                   keyboardType: TextInputType.number,
-                                  validator: (v) { if (v == null || v.trim().isEmpty) return 'Required'; if (int.tryParse(v.trim()) == null || int.parse(v.trim()) < 0) return 'Invalid'; return null; }),
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'Required';
+                                    }
+                                    if (int.tryParse(v.trim()) == null ||
+                                        int.parse(v.trim()) < 0) {
+                                      return 'Invalid';
+                                    }
+                                    return null;
+                                  }),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _formField(controller: priceCtrl, hint: 'Price (£)', icon: Icons.payments_outlined, context: context,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  validator: (v) { if (v == null || v.trim().isEmpty) return 'Required'; if (double.tryParse(v.trim()) == null) return 'Invalid'; return null; }),
+                              child: _formField(
+                                  controller: priceCtrl,
+                                  hint: 'Price (\u00A3)',
+                                  icon: Icons.payments_outlined,
+                                  context: context,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'Required';
+                                    }
+                                    if (double.tryParse(v.trim()) == null) {
+                                      return 'Invalid';
+                                    }
+                                    return null;
+                                  }),
                             ),
                           ],
                         ),
-
                         if (isEditing) ...[
                           const SizedBox(height: 18),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(15),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF131D19) : Colors.grey.shade50,
+                              color: isDark
+                                  ? const Color(0xFF131D19)
+                                  : Colors.grey.shade50,
                               borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
+                              border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF1D322A)
+                                      : Colors.grey.shade200),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Stock Adjustment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                                Text('Stock Adjustment',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: cs.onSurface)),
                                 const SizedBox(height: 5),
-                                Text('Current stock: ${existing['stock']}', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                                Text('Current stock: ${existing.stock}',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurfaceVariant)),
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String>(
                                   initialValue: stockAction,
                                   decoration: InputDecoration(
                                     prefixIcon: Icon(
-                                      stockAction == 'Add Stock' ? Icons.add_circle_outline : Icons.remove_circle_outline,
-                                      color: stockAction == 'Add Stock' ? Colors.green : Colors.red,
+                                      stockAction == 'Add Stock'
+                                          ? Icons.add_circle_outline
+                                          : Icons.remove_circle_outline,
+                                      color: stockAction == 'Add Stock'
+                                          ? Colors.green
+                                          : Colors.red,
                                     ),
                                     labelText: 'Stock Action',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14)),
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 14),
                                   ),
                                   items: const [
-                                    DropdownMenuItem(value: 'Add Stock', child: Text('Add Stock')),
-                                    DropdownMenuItem(value: 'Remove Stock', child: Text('Remove Stock')),
+                                    DropdownMenuItem(
+                                        value: 'Add Stock',
+                                        child: Text('Add Stock')),
+                                    DropdownMenuItem(
+                                        value: 'Remove Stock',
+                                        child: Text('Remove Stock')),
                                   ],
                                   onChanged: (value) {
                                     if (value == null) return;
-                                    setSheetState(() => stockAction = value);
+                                    setSheetState(() =>
+                                        stockAction = value);
                                   },
                                 ),
                                 const SizedBox(height: 12),
                                 _formField(
                                   controller: stockAdjustmentCtrl,
-                                  hint: stockAction == 'Add Stock' ? 'Quantity to add' : 'Quantity to remove',
-                                  icon: stockAction == 'Add Stock' ? Icons.add_rounded : Icons.remove_rounded,
+                                  hint: stockAction == 'Add Stock'
+                                      ? 'Quantity to add'
+                                      : 'Quantity to remove',
+                                  icon: stockAction == 'Add Stock'
+                                      ? Icons.add_rounded
+                                      : Icons.remove_rounded,
                                   context: context,
                                   keyboardType: TextInputType.number,
                                   validator: (v) {
-                                    if (v == null || v.trim().isEmpty) return 'Enter quantity';
-                                    final quantity = int.tryParse(v.trim());
-                                    if (quantity == null || quantity <= 0) return 'Enter a valid quantity';
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'Enter quantity';
+                                    }
+                                    final quantity =
+                                        int.tryParse(v.trim());
+                                    if (quantity == null ||
+                                        quantity <= 0) {
+                                      return 'Enter a valid quantity';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -372,26 +535,52 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                             ),
                           ),
                         ],
-
                         const SizedBox(height: 14),
-                        _formField(controller: lowStockCtrl, hint: 'Low stock threshold', icon: Icons.warning_amber_outlined, context: context,
+                        _formField(
+                            controller: lowStockCtrl,
+                            hint: 'Low stock threshold',
+                            icon: Icons.warning_amber_outlined,
+                            context: context,
                             keyboardType: TextInputType.number,
-                            validator: (v) { if (v == null || v.trim().isEmpty) return 'Required'; final value = int.tryParse(v.trim()); if (value == null) return 'Invalid'; if (value < 1) return 'Must be greater than 0'; return null; }),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              final value = int.tryParse(v.trim());
+                              if (value == null) return 'Invalid';
+                              if (value < 1) {
+                                return 'Must be greater than 0';
+                              }
+                              return null;
+                            }),
                         const SizedBox(height: 14),
-
                         DropdownButtonFormField<String>(
                           initialValue: category,
                           decoration: InputDecoration(
                             labelText: 'Medicine Category',
-                            prefixIcon: const Icon(Icons.category_outlined),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: const Color(0xFF0F7253))),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            prefixIcon:
+                                const Icon(Icons.category_outlined),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                    color: isDark
+                                        ? const Color(0xFF2A3A33)
+                                        : Colors.grey.shade300)),
+                            focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF0F7253))),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'OTC', child: Text('OTC')),
-                            DropdownMenuItem(value: 'Prescription', child: Text('Prescription')),
+                            DropdownMenuItem(
+                                value: 'OTC', child: Text('OTC')),
+                            DropdownMenuItem(
+                                value: 'Prescription',
+                                child: Text('Prescription')),
                           ],
                           onChanged: (value) {
                             if (value == null) return;
@@ -402,31 +591,41 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                           },
                         ),
                         const SizedBox(height: 14),
-
                         SwitchListTile(
-                          title: const Text('Prescription only', style: TextStyle(fontSize: 14)),
-                          subtitle: Text('Requires a prescription', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                          title: const Text('Prescription only',
+                              style: TextStyle(fontSize: 14)),
+                          subtitle: Text('Requires a prescription',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant)),
                           value: prescription,
                           onChanged: (value) {
                             setSheetState(() {
                               prescription = value;
-                              category = value ? 'Prescription' : 'OTC';
+                              category =
+                                  value ? 'Prescription' : 'OTC';
                             });
                           },
                           contentPadding: EdgeInsets.zero,
                           activeThumbColor: const Color(0xFF0F7253),
                         ),
                         const SizedBox(height: 20),
-
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
                             onPressed: () {
-                              if (!formKey.currentState!.validate()) return;
-                              int stock = int.parse(stockCtrl.text.trim());
-                              if (isEditing && stockAdjustmentCtrl.text.trim().isNotEmpty) {
-                                final quantity = int.parse(stockAdjustmentCtrl.text.trim());
+                              if (!formKey.currentState!.validate()) {
+                                return;
+                              }
+                              int stock =
+                                  int.parse(stockCtrl.text.trim());
+                              if (isEditing &&
+                                  stockAdjustmentCtrl.text
+                                      .trim()
+                                      .isNotEmpty) {
+                                final quantity = int.parse(
+                                    stockAdjustmentCtrl.text.trim());
                                 if (stockAction == 'Add Stock') {
                                   stock += quantity;
                                 } else {
@@ -434,45 +633,61 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
                                   if (stock < 0) stock = 0;
                                 }
                               }
-                              final threshold = int.parse(lowStockCtrl.text.trim());
-                              final newMedicine = <String, dynamic>{
-                                'name': nameCtrl.text.trim(),
-                                'genericName': genericCtrl.text.trim(),
-                                'category': category,
-                                'stock': stock,
-                                'price': double.parse(priceCtrl.text.trim()),
-                                'prescription': prescription,
-                                'lowStockThreshold': threshold,
-                              };
-                              setState(() {
-                                if (isEditing) {
-                                  final index = _medicines.indexOf(existing);
-                                  if (index != -1) _medicines[index] = newMedicine;
-                                } else {
-                                  _medicines.insert(0, newMedicine);
-                                }
-                              });
-                              Navigator.pop(ctx);
-                              String message;
-                              if (!isEditing) {
-                                message = 'Medicine added.';
-                              } else if (stockAction == 'Add Stock' && stockAdjustmentCtrl.text.trim().isNotEmpty) {
-                                message = 'Medicine updated. Stock added.';
-                              } else if (stockAction == 'Remove Stock' && stockAdjustmentCtrl.text.trim().isNotEmpty) {
-                                message = 'Medicine updated. Stock removed.';
+                              final threshold =
+                                  int.parse(lowStockCtrl.text.trim());
+                              final bloc = context
+                                  .read<PharmacyMedicinesBloc>();
+
+                              if (isEditing) {
+                                bloc.add(PharmacyMedicineUpdated(
+                                  medicineId: existing.id,
+                                  name: nameCtrl.text.trim(),
+                                  genericName:
+                                      genericCtrl.text.trim(),
+                                  category: category,
+                                  stock: stock,
+                                  price: double.parse(
+                                      priceCtrl.text.trim()),
+                                  prescription: prescription,
+                                  lowStockThreshold: threshold,
+                                ));
                               } else {
-                                message = 'Medicine updated.';
+                                bloc.add(PharmacyMedicineAdded(
+                                  name: nameCtrl.text.trim(),
+                                  genericName:
+                                      genericCtrl.text.trim(),
+                                  category: category,
+                                  stock: stock,
+                                  price: double.parse(
+                                      priceCtrl.text.trim()),
+                                  prescription: prescription,
+                                  lowStockThreshold: threshold,
+                                ));
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: const Color(0xFF0F7253)));
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: Text(isEditing
+                                    ? 'Medicine updated.'
+                                    : 'Medicine added.'),
+                                backgroundColor:
+                                    const Color(0xFF0F7253),
+                              ));
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F7253),
+                              backgroundColor:
+                                  const Color(0xFF0F7253),
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(15)),
                             ),
                             child: Text(
-                              isEditing ? 'Update Medicine' : 'Add Medicine',
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              isEditing
+                                  ? 'Update Medicine'
+                                  : 'Add Medicine',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
@@ -510,10 +725,21 @@ class _PharmacyMedicinesScreenState extends State<PharmacyMedicinesScreen> {
         hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
         prefixIcon: Icon(icon, color: cs.onSurfaceVariant, size: 20),
         errorStyle: const TextStyle(fontSize: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: const Color(0xFF0F7253))),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color:
+                    isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+                color:
+                    isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF0F7253))),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }

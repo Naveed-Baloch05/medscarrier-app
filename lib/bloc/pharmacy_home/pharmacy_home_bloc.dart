@@ -21,22 +21,24 @@ class PharmacyHomeBloc extends Bloc<PharmacyHomeEvent, PharmacyHomeState> {
     emit(const PharmacyHomeLoading());
 
     try {
-      final pharmacy = await _service.getPharmacy('pharmacy_1');
+      final pharmacy = await _service.getPharmacy(event.pharmacyId);
 
       if (pharmacy == null) {
         emit(const PharmacyHomeError('Pharmacy profile not found.'));
         return;
       }
 
+      final counts = await _service.getOrderCounts(event.pharmacyId);
+
       emit(PharmacyHomeLoaded(
         pharmacy: pharmacy,
-        totalOrders: 24,
-        completedOrders: 18,
-        activeOrders: 6,
-        newOrders: 2,
-        preparingOrders: 3,
-        readyOrders: 1,
-        deliveredOrders: 18,
+        totalOrders: counts['totalOrders'] ?? 0,
+        completedOrders: counts['completedOrders'] ?? 0,
+        activeOrders: counts['activeOrders'] ?? 0,
+        newOrders: counts['newOrders'] ?? 0,
+        preparingOrders: counts['preparingOrders'] ?? 0,
+        readyOrders: counts['readyOrders'] ?? 0,
+        deliveredOrders: counts['deliveredOrders'] ?? 0,
       ));
     } catch (error) {
       emit(PharmacyHomeError(
@@ -49,6 +51,6 @@ class PharmacyHomeBloc extends Bloc<PharmacyHomeEvent, PharmacyHomeState> {
     PharmacyHomeRefreshed event,
     Emitter<PharmacyHomeState> emit,
   ) async {
-    add(const LoadPharmacyHome());
+    add(LoadPharmacyHome(event.pharmacyId));
   }
 }

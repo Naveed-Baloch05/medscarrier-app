@@ -4,7 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/pharmacy_home/pharmacy_home_bloc.dart';
 import '../bloc/pharmacy_home/pharmacy_home_event.dart';
 import '../bloc/pharmacy_home/pharmacy_home_state.dart';
+import '../bloc/pharmacy_medicines/pharmacy_medicines_bloc.dart';
+import '../bloc/pharmacy_medicines/pharmacy_medicines_event.dart';
+import '../bloc/pharmacy_notifications/pharmacy_notifications_bloc.dart';
+import '../bloc/pharmacy_notifications/pharmacy_notifications_event.dart';
 import '../bloc/pharmacy_orders/pharmacy_orders_bloc.dart';
+import '../bloc/pharmacy_profile/pharmacy_profile_bloc.dart';
+import '../bloc/pharmacy_profile/pharmacy_profile_event.dart';
 import '../bloc/pharmacy_orders/pharmacy_orders_event.dart';
 import '../bloc/pharmacy_orders/pharmacy_orders_state.dart';
 
@@ -18,26 +24,46 @@ import 'pharmacy_profile_screen.dart';
 import 'pharmacy_notifications_screen.dart';
 
 class PharmacyHomeScreen extends StatelessWidget {
-  const PharmacyHomeScreen({super.key});
+  const PharmacyHomeScreen({super.key, required this.pharmacyId});
+
+  final String pharmacyId;
 
   @override
   Widget build(BuildContext context) {
+    // ignore: avoid_print
+    print('[HOME-SCREEN] pharmacyId=$pharmacyId (runtime=${pharmacyId.runtimeType})');
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => PharmacyHomeBloc()..add(const LoadPharmacyHome()),
+          create: (_) => PharmacyHomeBloc()
+            ..add(LoadPharmacyHome(pharmacyId)),
         ),
         BlocProvider(
-          create: (_) => PharmacyOrdersBloc()..add(const LoadPharmacyOrders()),
+          create: (_) => PharmacyOrdersBloc()
+            ..add(LoadPharmacyOrders(pharmacyId)),
+        ),
+        BlocProvider(
+          create: (_) => PharmacyMedicinesBloc()
+            ..add(LoadPharmacyMedicines(pharmacyId)),
+        ),
+        BlocProvider(
+          create: (_) => PharmacyProfileBloc()
+            ..add(LoadPharmacyProfile(pharmacyId)),
+        ),
+        BlocProvider(
+          create: (_) => PharmacyNotificationsBloc()
+            ..add(LoadPharmacyNotifications(pharmacyId)),
         ),
       ],
-      child: const _PharmacyHomeView(),
+      child: _PharmacyHomeView(pharmacyId: pharmacyId),
     );
   }
 }
 
 class _PharmacyHomeView extends StatefulWidget {
-  const _PharmacyHomeView();
+  const _PharmacyHomeView({required this.pharmacyId});
+
+  final String pharmacyId;
 
   @override
   State<_PharmacyHomeView> createState() => _PharmacyHomeViewState();
@@ -86,9 +112,9 @@ class _PharmacyHomeViewState extends State<_PharmacyHomeView> {
       case 1:
         return const PharmacyOrdersScreen();
       case 2:
-        return const PharmacyMedicinesScreen();
+        return PharmacyMedicinesScreen(pharmacyId: widget.pharmacyId);
       case 3:
-        return const PharmacyProfileScreen();
+        return PharmacyProfileScreen(pharmacyId: widget.pharmacyId);
       default:
         return _buildHomeTab();
     }
@@ -118,9 +144,9 @@ class _PharmacyHomeViewState extends State<_PharmacyHomeView> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      context
-                          .read<PharmacyHomeBloc>()
-                          .add(const LoadPharmacyHome());
+                      context.read<PharmacyHomeBloc>().add(
+                            LoadPharmacyHome(widget.pharmacyId),
+                          );
                     },
                     child: const Text('Try Again'),
                   ),
@@ -132,199 +158,198 @@ class _PharmacyHomeViewState extends State<_PharmacyHomeView> {
 
         if (homeState is PharmacyHomeLoaded) {
           return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                // Top section: header + toggle + filter tabs
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header
-                        PharmacyHomeHeader(
-                          pharmacyName: homeState.pharmacy.pharmacyName,
-                          pharmacyCode:
-                              homeState.pharmacy.gphcNumber,
-                          onNotificationTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const PharmacyNotificationsScreen(),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PharmacyHomeHeader(
+                        pharmacyName: homeState.pharmacy.pharmacyName,
+                        pharmacyCode:
+                            homeState.pharmacy.gphcNumber,
+                        onNotificationTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BlocProvider(
+                                create: (_) => PharmacyNotificationsBloc()
+                                  ..add(LoadPharmacyNotifications(widget.pharmacyId)),
+                                child: PharmacyNotificationsScreen(
+                                  pharmacyId: widget.pharmacyId,
+                                ),
                               ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
 
-                        // Accepting Orders + Filter Tabs
-                        PharmacyOrderSummary(
-                          isAcceptingOrders: _isAcceptingOrders,
-                          onToggleAccepting: (val) {
-                            setState(() => _isAcceptingOrders = val);
-                          },
-                          newCount: homeState.newOrders,
-                          preparingCount: homeState.preparingOrders,
-                          readyCount: homeState.readyOrders,
-                          deliveredCount: homeState.deliveredOrders,
-                          selectedTab: _selectedFilterTab,
-                          onTabTap: (index) {
-                            setState(() => _selectedFilterTab = index);
-                            context.read<PharmacyOrdersBloc>().add(
-                                  PharmacyOrdersFiltered(
-                                    _filterLabels[index],
-                                  ),
-                                );
-                            // Switch to Orders tab
-                            setState(() => _currentIndex = 1);
-                          },
-                        ),
-                        const SizedBox(height: 20),
+                      PharmacyOrderSummary(
+                        isAcceptingOrders: _isAcceptingOrders,
+                        onToggleAccepting: (val) {
+                          setState(() => _isAcceptingOrders = val);
+                        },
+                        newCount: homeState.newOrders,
+                        preparingCount: homeState.preparingOrders,
+                        readyCount: homeState.readyOrders,
+                        deliveredCount: homeState.deliveredOrders,
+                        selectedTab: _selectedFilterTab,
+                        onTabTap: (index) {
+                          setState(() => _selectedFilterTab = index);
+                          context.read<PharmacyOrdersBloc>().add(
+                                PharmacyOrdersFiltered(
+                                  _filterLabels[index],
+                                ),
+                              );
+                          setState(() => _currentIndex = 1);
+                        },
+                      ),
+                      const SizedBox(height: 20),
 
-                        // Live Orders Header
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Live orders',
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Live orders',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() => _currentIndex = 1);
+                            },
+                            child: Text(
+                              'View all',
                               style: TextStyle(
-                                fontSize: 18,
+                                color:
+                                    Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            TextButton(
-                              onPressed: () {
-                                setState(() => _currentIndex = 1);
-                              },
-                              child: Text(
-                                'View all',
-                                style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+              ),
 
-                // Active order cards from bloc
-                BlocBuilder<PharmacyOrdersBloc, PharmacyOrdersState>(
-                  builder: (context, orderState) {
-                    if (orderState is PharmacyOrdersLoaded) {
-                      final activeOrders = orderState.allOrders
-                          .where((o) => o.status != 'Delivered')
-                          .toList();
+              BlocBuilder<PharmacyOrdersBloc, PharmacyOrdersState>(
+                builder: (context, orderState) {
+                  if (orderState is PharmacyOrdersLoaded) {
+                    final activeOrders = orderState.allOrders
+                        .where((o) => o.status.toLowerCase() != 'delivered')
+                        .toList();
 
-                      if (activeOrders.isEmpty) {
-                        return SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).cardColor,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.check_circle_outline_rounded,
-                                    size: 40,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'All caught up!',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'No active orders right now.',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    if (activeOrders.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ),
-                        );
-                      }
-
-                      return SliverPadding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0),
-                        sliver: SliverList(
-                          delegate: SliverChildListDelegate(
-                            activeOrders.take(4).map((order) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.only(bottom: 12),
-                                child: PharmacyActiveOrderCard(
-                                  orderId: order.id,
-                                  customerName: order.customerName,
-                                  orderTime: order.time,
-                                  medicineCount:
-                                      '${order.medicineCount} ${order.medicineCount == 1 ? "item" : "items"}',
-                                  status: order.status,
-                                  statusType:
-                                      _mapStatus(order.status),
-                                  location: 'London, UK',
-                                  tags: _extractTags(order),
-                                  actionButtonText:
-                                      _actionForStatus(order.status),
-                                  onActionPressed: () {
-                                    _handleOrderAction(order);
-                                  },
-                                  riderName: order.riderName,
-                                  driverInitials: order.riderName
-                                          .isNotEmpty
-                                      ? order.riderName
-                                          .split(' ')
-                                          .map((w) => w[0])
-                                          .join()
-                                      : '',
-                                  driverStatus:
-                                      order.riderName.isNotEmpty
-                                          ? 'Collecting now'
-                                          : '',
-                                  onTap: () {},
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 40,
+                                  color:
+                                      Theme.of(context).colorScheme.primary,
                                 ),
-                              );
-                            }).toList(),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'All caught up!',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'No active orders right now.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
                     }
 
-                    return const SliverToBoxAdapter(
-                      child: SizedBox(),
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate(
+                          activeOrders.take(4).map((order) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: 12),
+                              child: PharmacyActiveOrderCard(
+                                orderId: order.id,
+                                customerName: order.customerName,
+                                orderTime: order.time,
+                                medicineCount:
+                                    '${order.medicineCount} ${order.medicineCount == 1 ? "item" : "items"}',
+                                status: order.status,
+                                statusType:
+                                    _mapStatus(order.status),
+                                location: '',
+                                tags: _extractTags(order),
+                                actionButtonText:
+                                    _actionForStatus(order.status),
+                                onActionPressed: () {
+                                  _handleOrderAction(order);
+                                },
+                                riderName: order.riderName,
+                                driverInitials: order.riderName
+                                        .isNotEmpty
+                                    ? order.riderName
+                                        .split(' ')
+                                        .map((w) => w[0])
+                                        .join()
+                                    : '',
+                                driverStatus:
+                                    order.riderName.isNotEmpty
+                                        ? 'Collecting now'
+                                        : '',
+                                onTap: () {},
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     );
-                  },
-                ),
+                  }
 
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              ],
-            );
+                  return const SliverToBoxAdapter(
+                    child: SizedBox(),
+                  );
+                },
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          );
         }
 
         return const SizedBox();

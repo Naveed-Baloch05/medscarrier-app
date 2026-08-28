@@ -11,3 +11,7 @@ class RiderLoginSubmitted extends RiderLoginEvent {
   final String email;
   final String password;
 }
+
+class RiderLoginReset extends RiderLoginEvent {
+  const RiderLoginReset();
+}

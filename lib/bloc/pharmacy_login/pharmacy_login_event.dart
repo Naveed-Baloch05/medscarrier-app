@@ -11,3 +11,7 @@ class PharmacyLoginSubmitted extends PharmacyLoginEvent {
   final String email;
   final String password;
 }
+
+class PharmacyLoginReset extends PharmacyLoginEvent {
+  const PharmacyLoginReset();
+}

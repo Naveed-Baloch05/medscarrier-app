@@ -1,17 +1,17 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/services/admin_dashboard_service.dart';
 import '../../core/services/admin_rider_service.dart';
-import '../../core/services/rider_application_service.dart';
 import 'admin_rider_event.dart';
 import 'admin_rider_state.dart';
 
 class AdminRiderBloc extends Bloc<AdminRiderEvent, AdminRiderState> {
   AdminRiderBloc({
     AdminRiderService? service,
-    RiderApplicationService? applicationService,
+    AdminDashboardService? dashboardService,
   })  : _service = service ?? AdminRiderService.instance,
-        _applicationService =
-            applicationService ?? RiderApplicationService.instance,
+        _dashboardService =
+            dashboardService ?? AdminDashboardService.instance,
         super(const AdminRiderInitial()) {
     on<AdminRiderLoadRequested>(_onLoadRequested);
     on<AdminRiderAdded>(_onAdded);
@@ -25,12 +25,12 @@ class AdminRiderBloc extends Bloc<AdminRiderEvent, AdminRiderState> {
   }
 
   final AdminRiderService _service;
-  final RiderApplicationService _applicationService;
+  final AdminDashboardService _dashboardService;
 
   Future<void> _loadData(Emitter<AdminRiderState> emit) async {
     final riders = await _service.getAllRiders();
     final pendingApplications =
-        await _applicationService.getPendingApplications();
+        await _dashboardService.getPendingApplications();
     emit(AdminRiderLoadedWithApplications(
       riders,
       pendingApplications,
@@ -144,7 +144,7 @@ class AdminRiderBloc extends Bloc<AdminRiderEvent, AdminRiderState> {
     Emitter<AdminRiderState> emit,
   ) async {
     try {
-      await _applicationService.approveApplication(
+      await _dashboardService.approveRiderApplication(
         applicationId: event.applicationId,
       );
       emit(const AdminRiderOperationSuccess(
@@ -163,7 +163,7 @@ class AdminRiderBloc extends Bloc<AdminRiderEvent, AdminRiderState> {
     Emitter<AdminRiderState> emit,
   ) async {
     try {
-      await _applicationService.rejectApplication(
+      await _dashboardService.rejectRiderApplication(
         applicationId: event.applicationId,
         rejectionReason: event.rejectionReason,
       );

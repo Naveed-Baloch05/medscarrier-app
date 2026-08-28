@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../bloc/pharmacy_signup/pharmacy_signup_bloc.dart';
 import '../bloc/pharmacy_signup/pharmacy_signup_event.dart';
 import '../bloc/pharmacy_signup/pharmacy_signup_state.dart';
+import 'pharmacy_location_picker_screen.dart';
 import 'pharmacy_login_screen.dart';
 
 class PharmacySignupScreen extends StatefulWidget {
@@ -27,7 +28,13 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  double? _latitude;
+  double? _longitude;
   final _gphcController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -39,6 +46,8 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _gphcController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -56,6 +65,26 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
     final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,}$');
     if (!emailRegex.hasMatch(value.trim())) {
       return 'Enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please confirm your password';
+    }
+    if (value != _passwordController.text) {
+      return 'Passwords do not match';
     }
     return null;
   }
@@ -89,7 +118,10 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
           email: _emailController.text.trim(),
           phone: _phoneController.text.trim(),
           businessAddress: _addressController.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
           gphcNumber: _gphcController.text.trim(),
+          password: _passwordController.text,
           licenseDocument: _licenseDocument,
         ));
   }
@@ -131,6 +163,27 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
     if (picked != null) {
       setState(() => _licenseDocument = File(picked.path));
     }
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push<PharmacyLocationResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PharmacyLocationPickerScreen(
+          initialAddress: _addressController.text,
+          initialLatitude: _latitude,
+          initialLongitude: _longitude,
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      _addressController.text = result.address;
+      _latitude = result.latitude;
+      _longitude = result.longitude;
+    });
   }
 
   double _scale(BuildContext context) {
@@ -185,20 +238,92 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
                         PharmacySignupState>(
                       listener: (context, state) {
                         if (state is PharmacySignupSuccess) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Application submitted successfully. Your pharmacy account is waiting for admin approval.',
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: isDark
+                                  ? const Color(0xFF151E1A)
+                                  : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              backgroundColor: Color(0xFF0F7253),
-                              duration: Duration(seconds: 4),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0F7253)
+                                          .withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_circle_outline,
+                                      color: Color(0xFF0F7253),
+                                      size: 38,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Text(
+                                    'Approval Request Sent',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Your approval request has been sent to the admin for approval. Once approved, you will receive an email with a link to create your password and log into your account.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark
+                                          ? const Color(0xFF8B9B94)
+                                          : const Color(0xFF6E7A75),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF0F7253),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        Navigator.of(context)
+                                            .pushAndRemoveUntil(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const PharmacyLoginScreen(),
+                                          ),
+                                          (route) => route.isFirst,
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Back to Login',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (_) => const PharmacyLoginScreen(),
-                            ),
-                            (route) => route.isFirst,
                           );
                         } else if (state is PharmacySignupFailure) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -309,7 +434,70 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
                                     hintText: 'Business address',
                                     icon: Icons.location_on_outlined,
                                     isDark: isDark,
-                                    validator: (v) => _validateRequired(v, 'Business address'),
+                                    validator: (v) =>
+                                        _validateRequired(v, 'Business address'),
+                                    suffixIcon: IconButton(
+                                      tooltip: 'Set location on map',
+                                      icon: Icon(
+                                        Icons.map_outlined,
+                                        color: isDark
+                                            ? const Color(0xFF32C787)
+                                            : const Color(0xFF0F7253),
+                                        size: 22,
+                                      ),
+                                      onPressed: _pickLocation,
+                                    ),
+                                  ),
+                                  SizedBox(height: 12 * scale),
+                                  _buildCustomTextField(
+                                    controller: _passwordController,
+                                    hintText: 'Password (min. 6 characters)',
+                                    icon: Icons.lock_outline_rounded,
+                                    isPassword: _obscurePassword,
+                                    isDark: isDark,
+                                    validator: _validatePassword,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: isDark
+                                            ? const Color(0xFF6E9585)
+                                            : const Color(0xFF6E7A75),
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  SizedBox(height: 12 * scale),
+                                  _buildCustomTextField(
+                                    controller: _confirmPasswordController,
+                                    hintText: 'Confirm password',
+                                    icon: Icons.lock_outline_rounded,
+                                    isPassword: _obscureConfirmPassword,
+                                    isDark: isDark,
+                                    validator: _validateConfirmPassword,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscureConfirmPassword
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: isDark
+                                            ? const Color(0xFF6E9585)
+                                            : const Color(0xFF6E7A75),
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscureConfirmPassword =
+                                              !_obscureConfirmPassword;
+                                        });
+                                      },
+                                    ),
                                   ),
 
                                   SizedBox(height: 20 * scale),
@@ -640,6 +828,7 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
     required bool isDark,
     bool isPassword = false,
     bool isHighlighted = false,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
   }) {
@@ -693,6 +882,7 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
           color: isDark ? const Color(0xFF6E9585) : const Color(0xFF6E7A75),
           size: 22,
         ),
+        suffixIcon: suffixIcon,
       ),
     );
   }

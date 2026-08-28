@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,6 +5,7 @@ import '../../bloc/admin_rider/admin_rider_bloc.dart';
 import '../../bloc/admin_rider/admin_rider_event.dart';
 import '../../bloc/admin_rider/admin_rider_state.dart';
 import '../../models/rider_application_model.dart';
+import '../../widgets/document_preview_dialog.dart';
 
 class AdminRiderManagementScreen extends StatefulWidget {
 const AdminRiderManagementScreen({
@@ -1733,6 +1733,34 @@ void _showApplicationDetails(RiderApplicationModel app) {
                 _detailItem(
                   'Background Check Consent',
                   app.backgroundCheckConsent ? 'Yes' : 'No',
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Driving Licence Documents',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DocumentImageThumbnail(
+                        title: 'Licence Front',
+                        imageUrl: app.drivingLicenceFrontUrl,
+                        height: 120,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DocumentImageThumbnail(
+                        title: 'Licence Back',
+                        imageUrl: app.drivingLicenceBackUrl,
+                        height: 120,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
                 Row(

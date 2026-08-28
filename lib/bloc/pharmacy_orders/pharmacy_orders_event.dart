@@ -3,7 +3,9 @@ abstract class PharmacyOrdersEvent {
 }
 
 class LoadPharmacyOrders extends PharmacyOrdersEvent {
-  const LoadPharmacyOrders();
+  const LoadPharmacyOrders([this.pharmacyId = '']);
+
+  final String pharmacyId;
 }
 
 class PharmacyOrdersRefreshed extends PharmacyOrdersEvent {

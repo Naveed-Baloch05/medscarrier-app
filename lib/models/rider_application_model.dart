@@ -23,6 +23,7 @@ class RiderApplicationModel {
   });
 
   final String applicationId;
+  String get id => applicationId;
   final String uid;
   final String fullName;
   final String email;
