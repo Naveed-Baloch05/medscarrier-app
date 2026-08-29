@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../bloc/rider_map/rider_map_bloc.dart';
 import '../bloc/rider_map/rider_map_event.dart';
@@ -21,6 +25,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   late final RiderMapBloc _bloc;
   final List<Offset?> _signaturePoints = [];
 
+  GoogleMapController? _mapController;
+  LatLng? _currentRiderLocation;
+  bool _locationPermissionGranted = false;
+  bool _isLoadingLocation = true;
+  String? _locationError;
+
+  // Default fallback center (e.g. Islamabad / default coordinates)
+  static const LatLng _defaultLocation = LatLng(33.6844, 73.0479);
+
   @override
   void initState() {
     super.initState();
@@ -28,18 +41,165 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     final orderId = widget.initialOrderId?.trim();
     if (orderId != null && orderId.isNotEmpty) {
       _bloc.add(SubscribeToOrder(orderId));
-      return;
+    } else {
+      final riderId = widget.riderId?.trim();
+      if (riderId != null && riderId.isNotEmpty) {
+        _bloc.add(SubscribeToMap(riderId));
+      }
     }
-    final riderId = widget.riderId?.trim();
-    if (riderId != null && riderId.isNotEmpty) {
-      _bloc.add(SubscribeToMap(riderId));
-    }
+
+    _initLocation();
   }
 
   @override
   void dispose() {
+    _mapController?.dispose();
     _bloc.close();
     super.dispose();
+  }
+
+  // ============================================================
+  // LOCATION & PERMISSION HANDLING
+  // ============================================================
+
+  Future<void> _initLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+      _locationError = null;
+    });
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _locationError = 'Location services are disabled on this device.';
+          _isLoadingLocation = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _locationError = 'Location permission was denied.';
+            _locationPermissionGranted = false;
+            _isLoadingLocation = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _locationError = 'Location permissions are permanently denied. Please enable them in system settings.';
+          _locationPermissionGranted = false;
+          _isLoadingLocation = false;
+        });
+        return;
+      }
+
+      _locationPermissionGranted = true;
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentRiderLocation = LatLng(position.latitude, position.longitude);
+          _isLoadingLocation = false;
+        });
+
+        _fitMapToPoints();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _locationError = 'Could not acquire current location: $e';
+          _isLoadingLocation = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _recenterOnRider() async {
+    if (_currentRiderLocation != null && _mapController != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: _currentRiderLocation!, zoom: 16.0),
+        ),
+      );
+      if (mounted) {
+        _showMessage(context, 'Centered on your current location', isError: false);
+      }
+    } else {
+      await _initLocation();
+      if (_currentRiderLocation != null && _mapController != null) {
+        await _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: _currentRiderLocation!, zoom: 16.0),
+          ),
+        );
+      } else if (mounted && _locationError != null) {
+        _showMessage(context, _locationError!, isError: true);
+      }
+    }
+  }
+
+  void _fitMapToPoints() {
+    if (_mapController == null) return;
+    final session = _sessionOf(_bloc.state);
+
+    final points = <LatLng>[];
+    if (_currentRiderLocation != null) {
+      points.add(_currentRiderLocation!);
+    } else if (session?.riderLat != null && session?.riderLng != null) {
+      points.add(LatLng(session!.riderLat!, session.riderLng!));
+    }
+
+    if (session?.pickupLat != null && session?.pickupLng != null) {
+      points.add(LatLng(session!.pickupLat!, session.pickupLng!));
+    }
+
+    if (session?.dropoffLat != null && session?.dropoffLng != null) {
+      points.add(LatLng(session!.dropoffLat!, session.dropoffLng!));
+    }
+
+    if (points.isEmpty) return;
+
+    if (points.length == 1) {
+      _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: points.first, zoom: 15.0),
+        ),
+      );
+      return;
+    }
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final p in points) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 70),
+    );
   }
 
   // 0 = navigating, 1 = arrived, 2 = completed
@@ -69,9 +229,12 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           listener: (context, state) {
             if (state is RiderMapOperationSuccess) {
               _showMessage(context, state.message, isError: false);
-            } else if (state is RiderMapError &&
-                state.message.isNotEmpty) {
+            } else if (state is RiderMapError && state.message.isNotEmpty) {
               _showMessage(context, state.message, isError: true);
+            } else if (state is RiderMapLoaded) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _fitMapToPoints();
+              });
             }
           },
           child: SafeArea(
@@ -98,8 +261,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                               c is RiderMapUpdating ||
                               c is RiderMapOperationSuccess,
                           builder: (context, state) {
-                            final step =
-                                _stepFor(_sessionOf(state) ?? _emptySession());
+                            final step = _stepFor(_sessionOf(state) ?? _emptySession());
                             return _buildTopBar(context, isDark, step, state);
                           },
                         ),
@@ -135,125 +297,239 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     return null;
   }
 
-  RiderMapSession _emptySession() =>
-      RiderMapSession(order: OrderModel.noOp());
+  RiderMapSession _emptySession() => RiderMapSession(order: OrderModel.noOp());
 
   // ============================================================
-  // MAP AREA
+  // GOOGLE MAP AREA
   // ============================================================
 
   Widget _buildMapArea(BuildContext context, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF18231E) : const Color(0xFFE8EEE9),
-      ),
-      child: BlocBuilder<RiderMapBloc, RiderMapState>(
-        buildWhen: (p, c) =>
-            c is RiderMapLoaded ||
-            c is RiderMapUpdating ||
-            c is RiderMapOperationSuccess,
-        builder: (context, state) {
-          final session = _sessionOf(state);
-          final order = session?.order;
-          final hasOrder = order != null && order.id.isNotEmpty;
+    return BlocBuilder<RiderMapBloc, RiderMapState>(
+      buildWhen: (p, c) =>
+          c is RiderMapLoaded ||
+          c is RiderMapUpdating ||
+          c is RiderMapOperationSuccess ||
+          c is RiderMapLoading,
+      builder: (context, state) {
+        final session = _sessionOf(state);
+        final order = session?.order;
+        final hasOrder = order != null && order.id.isNotEmpty;
 
-          return Stack(
-            children: [
-              Positioned.fill(child: CustomPaint(painter: _MapPainter(isDark: isDark))),
-              if (hasOrder == false && state is RiderMapLoading)
-                Center(
-                  child: CircularProgressIndicator(
-                    color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
+        final markers = _buildMarkers(session);
+        final polylines = _buildPolylines(session);
+
+        final initialTarget = _currentRiderLocation ??
+            (session?.pickupLat != null && session?.pickupLng != null
+                ? LatLng(session!.pickupLat!, session.pickupLng!)
+                : (session?.riderLat != null && session?.riderLng != null
+                    ? LatLng(session!.riderLat!, session.riderLng!)
+                    : _defaultLocation));
+
+        return Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: initialTarget,
+                zoom: 14.5,
+              ),
+              onMapCreated: (controller) {
+                _mapController = controller;
+                _fitMapToPoints();
+              },
+              style: isDark ? _darkMapStyle : null,
+              myLocationEnabled: _locationPermissionGranted,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              compassEnabled: true,
+              markers: markers,
+              polylines: polylines,
+              padding: const EdgeInsets.only(top: 80, bottom: 260),
+            ),
+
+            if (hasOrder && session != null && (session.distance != '—' || session.eta != '—'))
+              Positioned(
+                top: 70,
+                left: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.route_outlined, size: 16, color: Color(0xFF7C4DFF)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${session.distance} • ${session.eta}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
                 ),
-              if (hasOrder) ...[
-                Positioned(
-                  left: 95,
-                  top: 230,
-                  child: _buildMapMarker(
-                    icon: Icons.navigation_rounded,
-                    color: const Color(0xFF0F7253),
-                    label: 'You',
-                    caption: _riderLocationCaption(session),
+              ),
+
+            if (_isLoadingLocation && _currentRiderLocation == null)
+              Positioned(
+                top: 70,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 6),
+                    ],
                   ),
-                ),
-                Positioned(
-                  right: 92,
-                  top: 155,
-                  child: _buildMapMarker(
-                    icon: Icons.storefront,
-                    color: const Color(0xFF32C787),
-                    label: 'Pickup',
-                    caption: _pickupCaption(session),
-                  ),
-                ),
-                Positioned(
-                  right: 72,
-                  bottom: 305,
-                  child: _buildMapMarker(
-                    icon: Icons.location_on_rounded,
-                    color: const Color(0xFF7C4DFF),
-                    label: 'Drop-off',
-                    caption: _dropoffCaption(session),
-                  ),
-                ),
-                Positioned(
-                  top: 118,
-                  left: 22,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.route_outlined, size: 16, color: Color(0xFF7C4DFF)),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${session!.distance} • ${session.eta}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
                         ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('Locating…', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+
+            if (_locationError != null && !_locationPermissionGranted)
+              Positioned(
+                top: 70,
+                right: 16,
+                child: GestureDetector(
+                  onTap: _initLocation,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade800,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.location_disabled, size: 13, color: Colors.white),
+                        SizedBox(width: 5),
+                        Text('Enable GPS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
                       ],
                     ),
                   ),
                 ),
-              ],
-            ],
-          );
-        },
-      ),
+              ),
+          ],
+        );
+      },
     );
   }
 
-  String? _riderLocationCaption(RiderMapSession? session) {
-    final r = session;
-    if (r == null) return null;
-    if (r.riderLat != null && r.riderLng != null) {
-      return '${r.riderLat!.toStringAsFixed(4)}, ${r.riderLng!.toStringAsFixed(4)}';
+  Set<Marker> _buildMarkers(RiderMapSession? session) {
+    final markers = <Marker>{};
+
+    // 1. Current Rider Position Marker
+    final riderPos = _currentRiderLocation ??
+        (session?.riderLat != null && session?.riderLng != null
+            ? LatLng(session!.riderLat!, session.riderLng!)
+            : null);
+
+    if (riderPos != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('rider_position'),
+          position: riderPos,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+          infoWindow: InfoWindow(
+            title: session?.riderName != null && session!.riderName!.isNotEmpty
+                ? session.riderName
+                : 'Your Location',
+            snippet: 'Rider Current Position',
+          ),
+        ),
+      );
     }
-    return null;
+
+    // 2. Pharmacy Pickup Marker
+    if (session?.pickupLat != null && session?.pickupLng != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('pickup_location'),
+          position: LatLng(session!.pickupLat!, session.pickupLng!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          infoWindow: InfoWindow(
+            title: 'Pickup: ${session.pharmacy}',
+            snippet: session.pharmacyAddressText,
+          ),
+        ),
+      );
+    }
+
+    // 3. Customer Dropoff Marker
+    if (session?.dropoffLat != null && session?.dropoffLng != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('dropoff_location'),
+          position: LatLng(session!.dropoffLat!, session.dropoffLng!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          infoWindow: InfoWindow(
+            title: 'Drop-off: ${session.customer}',
+            snippet: session.customerAddressText,
+          ),
+        ),
+      );
+    }
+
+    return markers;
   }
 
-  String _pickupCaption(RiderMapSession? session) {
-    final r = session;
-    if (r == null) return '';
-    if (r.pickupLat != null && r.pickupLng != null) {
-      return '${r.pickupLat!.toStringAsFixed(4)}, ${r.pickupLng!.toStringAsFixed(4)}';
-    }
-    return r.pharmacy;
-  }
+  Set<Polyline> _buildPolylines(RiderMapSession? session) {
+    final polylines = <Polyline>{};
+    final points = <LatLng>[];
 
-  String _dropoffCaption(RiderMapSession? session) {
-    final r = session;
-    if (r == null) return '';
-    if (r.dropoffLat != null && r.dropoffLng != null) {
-      return '${r.dropoffLat!.toStringAsFixed(4)}, ${r.dropoffLng!.toStringAsFixed(4)}';
+    final riderPos = _currentRiderLocation ??
+        (session?.riderLat != null && session?.riderLng != null
+            ? LatLng(session!.riderLat!, session.riderLng!)
+            : null);
+
+    if (riderPos != null) {
+      points.add(riderPos);
     }
-    return r.customer;
+
+    if (session?.pickupLat != null && session?.pickupLng != null) {
+      points.add(LatLng(session!.pickupLat!, session.pickupLng!));
+    }
+
+    if (session?.dropoffLat != null && session?.dropoffLng != null) {
+      points.add(LatLng(session!.dropoffLat!, session.dropoffLng!));
+    }
+
+    if (points.length >= 2) {
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('delivery_path'),
+          points: points,
+          color: const Color(0xFF7C4DFF),
+          width: 4,
+          jointType: JointType.round,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+        ),
+      );
+    }
+
+    return polylines;
   }
 
   Widget _buildMapButton(BuildContext context, {required IconData icon, required VoidCallback onTap}) {
@@ -279,48 +555,6 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     );
   }
 
-  Widget _buildMapMarker({
-    required IconData icon,
-    required Color color,
-    required String label,
-    String? caption,
-  }) {
-    return Column(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.20), blurRadius: 8)],
-          ),
-          child: Icon(icon, color: Colors.white, size: 21),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 5)],
-          ),
-          child: Column(
-            children: [
-              Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.black)),
-              if (caption != null && caption.isNotEmpty)
-                Text(
-                  caption,
-                  style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Colors.black87),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildLocateButton(BuildContext context) {
     return Positioned(
       right: 16,
@@ -328,11 +562,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       child: _buildMapButton(
         context,
         icon: Icons.my_location_rounded,
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Current location selected'), duration: Duration(seconds: 1)),
-          );
-        },
+        onTap: _recenterOnRider,
       ),
     );
   }
@@ -1117,77 +1347,77 @@ class _SignaturePainter extends CustomPainter {
 }
 
 // ============================================================
-// MAP PAINTER
+// DARK MAP STYLE JSON FOR GOOGLE MAPS
 // ============================================================
 
-class _MapPainter extends CustomPainter {
-  final bool isDark;
-
-  _MapPainter({required this.isDark});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final backgroundPaint = Paint()
-      ..color = isDark ? const Color(0xFF18231E) : const Color(0xFFE8EEE9);
-
-    canvas.drawRect(Offset.zero & size, backgroundPaint);
-
-    final roadPaint = Paint()
-      ..color = isDark ? const Color(0xFF26342D) : const Color(0xFFD3DDD6)
-      ..strokeWidth = 18
-      ..style = PaintingStyle.stroke;
-
-    final roadPaintSmall = Paint()
-      ..color = isDark ? const Color(0xFF33443A) : const Color(0xFFDEE6E0)
-      ..strokeWidth = 9
-      ..style = PaintingStyle.stroke;
-
-    final path1 = Path()
-      ..moveTo(-50, size.height * 0.28)
-      ..quadraticBezierTo(size.width * 0.35, size.height * 0.18, size.width + 50, size.height * 0.35);
-
-    final path2 = Path()
-      ..moveTo(size.width * 0.15, -30)
-      ..quadraticBezierTo(size.width * 0.55, size.height * 0.40, size.width * 0.25, size.height + 30);
-
-    final path3 = Path()
-      ..moveTo(-20, size.height * 0.72)
-      ..quadraticBezierTo(size.width * 0.50, size.height * 0.52, size.width + 30, size.height * 0.75);
-
-    canvas.drawPath(path1, roadPaint);
-    canvas.drawPath(path2, roadPaint);
-    canvas.drawPath(path3, roadPaintSmall);
-
-    final routePaint = Paint()
-      ..color = const Color(0xFF7C4DFF)
-      ..strokeWidth = 5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final route = Path()
-      ..moveTo(size.width * 0.20, size.height * 0.47)
-      ..quadraticBezierTo(size.width * 0.40, size.height * 0.28, size.width * 0.62, size.height * 0.32)
-      ..quadraticBezierTo(size.width * 0.77, size.height * 0.40, size.width * 0.78, size.height * 0.63);
-
-    canvas.drawPath(route, routePaint);
-
-    final blockPaint = Paint()
-      ..color = isDark ? const Color(0xFF202D26) : const Color(0xFFDDE6DF);
-
-    final blocks = [
-      Rect.fromLTWH(25, 90, 75, 45),
-      Rect.fromLTWH(170, 80, 90, 52),
-      Rect.fromLTWH(300, 100, 75, 48),
-      Rect.fromLTWH(40, 330, 95, 55),
-      Rect.fromLTWH(200, 350, 100, 48),
-      Rect.fromLTWH(330, 300, 80, 60),
-    ];
-
-    for (final block in blocks) {
-      canvas.drawRRect(RRect.fromRectAndRadius(block, const Radius.circular(8)), blockPaint);
-    }
+const String _darkMapStyle = '''
+[
+  {
+    "elementType": "geometry",
+    "stylers": [{"color": "#1d2c25"}]
+  },
+  {
+    "elementType": "labels.text.fill",
+    "stylers": [{"color": "#8ec3b9"}]
+  },
+  {
+    "elementType": "labels.text.stroke",
+    "stylers": [{"color": "#1a362a"}]
+  },
+  {
+    "featureType": "administrative.country",
+    "elementType": "geometry.stroke",
+    "stylers": [{"color": "#4b6858"}]
+  },
+  {
+    "featureType": "landscape",
+    "elementType": "geometry",
+    "stylers": [{"color": "#18241e"}]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "geometry",
+    "stylers": [{"color": "#283d34"}]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "labels.text.fill",
+    "stylers": [{"color": "#6f9ba5"}]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry",
+    "stylers": [{"color": "#304339"}]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry.stroke",
+    "stylers": [{"color": "#212a24"}]
+  },
+  {
+    "featureType": "road",
+    "elementType": "labels.text.fill",
+    "stylers": [{"color": "#9ca5b3"}]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "geometry",
+    "stylers": [{"color": "#3c574a"}]
+  },
+  {
+    "featureType": "transit",
+    "elementType": "geometry",
+    "stylers": [{"color": "#2f3948"}]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": [{"color": "#17263c"}]
+  },
+  {
+    "featureType": "water",
+    "elementType": "labels.text.fill",
+    "stylers": [{"color": "#515c6d"}]
   }
-
-  @override
-  bool shouldRepaint(covariant _MapPainter oldDelegate) => oldDelegate.isDark != isDark;
-}
+]
+''';

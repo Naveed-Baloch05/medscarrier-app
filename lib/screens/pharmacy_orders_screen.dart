@@ -8,6 +8,7 @@ import '../bloc/pharmacy_orders/pharmacy_orders_state.dart';
 import '../widgets/pharmacy_order_card.dart';
 import '../widgets/pharmacy_order_filter.dart';
 import '../widgets/pharmacy_order_status_badge.dart';
+import 'pharmacy_location_picker_screen.dart';
 
 class PharmacyOrdersScreen extends StatelessWidget {
   const PharmacyOrdersScreen({super.key});
@@ -212,6 +213,9 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
     final totalCtrl = TextEditingController(text: isEditing ? existing.totalAmount.toStringAsFixed(2) : '');
 
     String status = isEditing ? existing.status : 'New';
+    String deliveryAddress = '';
+    double? deliveryLat;
+    double? deliveryLng;
     final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
@@ -311,6 +315,86 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                             if (v != null) setSheetState(() => status = v);
                           },
                         ),
+                        const SizedBox(height: 14),
+                        GestureDetector(
+                          onTap: () async {
+                            final result = await Navigator.push<PharmacyLocationResult>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PharmacyLocationPickerScreen(
+                                  initialAddress: deliveryAddress,
+                                  initialLatitude: deliveryLat,
+                                  initialLongitude: deliveryLng,
+                                ),
+                              ),
+                            );
+                            if (result == null) return;
+                            setSheetState(() {
+                              deliveryAddress = result.address;
+                              deliveryLat = result.latitude;
+                              deliveryLng = result.longitude;
+                            });
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: deliveryAddress.isNotEmpty
+                                  ? (isDark ? const Color(0xFF15301D) : Colors.green.shade50)
+                                  : cs.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: deliveryAddress.isNotEmpty
+                                    ? const Color(0xFF0F7253)
+                                    : (isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  color: deliveryAddress.isNotEmpty
+                                      ? const Color(0xFF0F7253)
+                                      : cs.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Delivery Location',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: cs.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        deliveryAddress.isEmpty
+                                            ? 'Tap to select the client delivery address on the map'
+                                            : deliveryAddress,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: deliveryAddress.isEmpty
+                                              ? cs.onSurfaceVariant
+                                              : cs.onSurface,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (deliveryAddress.isNotEmpty)
+                                  Icon(Icons.check_circle, color: const Color(0xFF0F7253), size: 18),
+                                if (deliveryAddress.isEmpty)
+                                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                              ],
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
@@ -318,6 +402,13 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                           child: ElevatedButton(
                             onPressed: () {
                               if (!formKey.currentState!.validate()) return;
+                              if (!isEditing && deliveryAddress.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                  content: Text('Please select a delivery location for the client.'),
+                                  backgroundColor: Colors.orange,
+                                ));
+                                return;
+                              }
                               if (isEditing) {
                                 context.read<PharmacyOrdersBloc>().add(PharmacyOrderUpdated(
                                       id: existing.id,
@@ -332,6 +423,9 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                       medicineCount: int.parse(qtyCtrl.text.trim()),
                                       status: status,
                                       totalAmount: double.parse(totalCtrl.text.trim()),
+                                      deliveryAddress: deliveryAddress,
+                                      deliveryLat: deliveryLat,
+                                      deliveryLng: deliveryLng,
                                     ));
                               }
                               Navigator.pop(ctx);

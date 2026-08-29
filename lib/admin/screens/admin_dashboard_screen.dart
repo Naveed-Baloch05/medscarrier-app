@@ -848,7 +848,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
                                             onPressed: () {
-                                              _showAssignRiderDialog(order.id);
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => AdminRiderManagementScreen(
+                                                    orderId: order.id,
+                                                    orderLabel: '${order.pharmacyName} → ${order.dropoffAddress}',
+                                                  ),
+                                                ),
+                                              ).then((_) {
+                                                if (mounted) {
+                                                  _dashboardBloc.add(const AdminDashboardRefreshed());
+                                                }
+                                              });
                                             },
                                             icon: const Icon(Icons.two_wheeler, size: 16),
                                             label: const Text('Assign rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
@@ -1154,31 +1166,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return '${diff.inDays}d ago';
   }
 
-  void _showAssignRiderDialog(String orderId) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Assign Rider'),
-        content: const Text('Go to Rider Management to assign a rider to this order.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminRiderManagementScreen()),
-              );
-            },
-            child: const Text('Go'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildTag(String label, Color bg, Color text) {
     return Container(

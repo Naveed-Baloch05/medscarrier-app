@@ -36,15 +36,19 @@ class PharmacyOrderCard extends StatelessWidget {
             // ORDER ID + TIME
             Row(
               children: [
-                Text(
-                  order.id,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F7253),
+                Expanded(
+                  child: Text(
+                    order.id,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F7253),
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   order.time,
                   style: TextStyle(
@@ -121,12 +125,16 @@ class PharmacyOrderCard extends StatelessWidget {
                     color: const Color(0xFF0F7253),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    'Rider: ${order.riderName}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF0F7253),
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      'Rider: ${order.riderName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF0F7253),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],

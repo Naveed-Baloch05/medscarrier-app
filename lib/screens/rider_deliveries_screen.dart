@@ -722,11 +722,43 @@ color: Colors.green.shade600,
             '';
     if (orderId.isEmpty) return;
 
+    final deliveryStatus =
+        delivery['status']?.toString() ?? 'Assigned';
+
+    final etaValue = delivery['eta']?.toString() ?? '';
+
+    final initialOrder = OrderModel(
+      id: orderId,
+      pharmacyId: '',
+      pharmacyName: delivery['pharmacy']?.toString() ?? '',
+      customerName: delivery['customer']?.toString() ?? '',
+      customerPhone: '',
+      pickupAddress:
+          delivery['pickup']?.toString() ??
+              delivery['pharmacyAddress']?.toString() ??
+              '',
+      dropoffAddress:
+          delivery['dropoff']?.toString() ??
+              delivery['address']?.toString() ??
+              '',
+      status: deliveryStatus == 'Completed' ? 'Completed' : deliveryStatus,
+      distance: delivery['distance']?.toString(),
+      estimatedTime: (etaValue.isNotEmpty &&
+              etaValue != '—' &&
+              etaValue != 'Completed')
+          ? etaValue
+          : null,
+      controlledDrug:
+          delivery['controlled'] == true || delivery['controlledDrug'] == true,
+      coldChain: delivery['coldChain'] == true,
+    );
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) {
           return RiderDeliveryDetailsScreen(
             orderId: orderId,
+            initialOrder: initialOrder,
           );
         },
       ),

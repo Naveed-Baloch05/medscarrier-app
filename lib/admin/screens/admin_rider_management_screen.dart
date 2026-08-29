@@ -10,7 +10,12 @@ import '../../widgets/document_preview_dialog.dart';
 class AdminRiderManagementScreen extends StatefulWidget {
 const AdminRiderManagementScreen({
 super.key,
+this.orderId,
+this.orderLabel,
 });
+
+final String? orderId;
+final String? orderLabel;
 
 @override
 State<AdminRiderManagementScreen> createState() =>
@@ -24,6 +29,9 @@ late final AdminRiderBloc _riderBloc;
 
 String _searchQuery = '';
 String _selectedFilter = 'All';
+
+String? _pendingAssignOrderId;
+String? _assigningRiderName;
 
 final List<String> _filters = [
 'All',
@@ -63,6 +71,7 @@ final bool online =
 
 return <String, dynamic>{
 'id': rider['id'] ?? '',
+'uid': rider['uid'] ?? rider['id'] ?? '',
 'name':
     (rider['fullName'] ?? '').toString(),
 'phone':
@@ -226,6 +235,13 @@ final borderColor = isDark
 
 return BlocProvider<AdminRiderBloc>.value(
 value: _riderBloc,
+child: BlocListener<AdminRiderBloc, AdminRiderState>(
+listenWhen: (previous, current) =>
+    current is AdminRiderOperationSuccess ||
+    current is AdminRiderError,
+listener: (context, state) {
+  _handleAssignmentResult(state);
+},
 child: BlocBuilder<AdminRiderBloc, AdminRiderState>(
 builder: (context, state) {
 final List<Map<String, dynamic>> allRiders;
@@ -310,6 +326,76 @@ padding: const EdgeInsets.fromLTRB(
 30,
 ),
 children: [
+// ====================================================
+// ASSIGNMENT CONTEXT BANNER
+// ====================================================
+
+if (widget.orderId != null && widget.orderId!.isNotEmpty) ...[
+  Container(
+  width: double.infinity,
+  padding: const EdgeInsets.symmetric(
+  horizontal: 14,
+  vertical: 13,
+  ),
+  decoration: BoxDecoration(
+  color: primaryColor.withValues(alpha: 0.08),
+  borderRadius: BorderRadius.circular(14),
+  border: Border.all(
+  color: primaryColor.withValues(alpha: 0.25),
+  ),
+  ),
+  child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+  Row(
+  children: [
+  Icon(
+  Icons.local_shipping_outlined,
+  size: 18,
+  color: primaryColor,
+  ),
+  const SizedBox(width: 8),
+  Expanded(
+  child: Text(
+  'Assigning order',
+  style: TextStyle(
+  fontSize: 9,
+  fontWeight: FontWeight.w600,
+  color: textSecondary,
+  letterSpacing: 0.4,
+  ),
+  ),
+  ),
+  ],
+  ),
+  const SizedBox(height: 6),
+  Text(
+  widget.orderId!,
+  style: TextStyle(
+  fontSize: 15,
+  fontWeight: FontWeight.w700,
+  color: textPrimary,
+  ),
+  ),
+  if (widget.orderLabel != null &&
+      widget.orderLabel!.isNotEmpty) ...[
+  const SizedBox(height: 3),
+  Text(
+  widget.orderLabel!,
+  maxLines: 1,
+  overflow: TextOverflow.ellipsis,
+  style: TextStyle(
+  fontSize: 11,
+  color: textSecondary,
+  ),
+  ),
+  ],
+  ],
+  ),
+  ),
+  const SizedBox(height: 14),
+],
+
 // ====================================================
 // SUMMARY
 // ====================================================
@@ -672,6 +758,7 @@ isDark: isDark,
 ),
 );
 },
+),
 ),
 );
 }
@@ -1122,6 +1209,40 @@ const SizedBox(height: 7),
 
 Row(
 children: [
+if (widget.orderId != null)
+  Expanded(
+  child: TextButton.icon(
+  onPressed: _pendingAssignOrderId == null
+      ? () => _assignOrderToRider(rider)
+      : null,
+  icon: _pendingAssignOrderId != null &&
+          _assigningRiderName == rider['name']
+      ? const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+      : Icon(
+          Icons.person_add_alt_1,
+          size: 16,
+          color: primaryColor,
+        ),
+  label: Text(
+  'Assign',
+  style: TextStyle(
+  color: primaryColor,
+  fontWeight: FontWeight.w600,
+  fontSize: 11,
+  ),
+  ),
+  ),
+  ),
+if (widget.orderId != null)
+  Container(
+  width: 1,
+  height: 22,
+  color: borderColor,
+  ),
 Expanded(
 child: TextButton.icon(
 onPressed: () {
@@ -1880,6 +2001,72 @@ color: textSecondary,
 ],
 ),
 );
+}
+
+// ============================================================
+// ASSIGN ORDER TO RIDER
+// ============================================================
+void _assignOrderToRider(Map<String, dynamic> rider) {
+final orderId = widget.orderId;
+if (orderId == null || orderId.isEmpty) return;
+
+final uidStr = rider['uid']?.toString().trim() ?? '';
+final idStr = rider['id']?.toString().trim() ?? '';
+final riderId = uidStr.isNotEmpty ? uidStr : idStr;
+
+if (riderId.isEmpty) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: const Text('Rider ID is missing. Cannot assign order.'),
+      backgroundColor: Colors.red.shade700,
+    ),
+  );
+  return;
+}
+
+setState(() {
+_pendingAssignOrderId = orderId;
+_assigningRiderName = rider['name']?.toString() ?? 'Rider';
+});
+
+_riderBloc.add(
+AdminRiderOrderAssigned(
+riderId,
+orderId,
+),
+);
+}
+
+// ============================================================
+// HANDLE ASSIGNMENT RESULT (from BLoC listener)
+// ============================================================
+
+void _handleAssignmentResult(AdminRiderState state) {
+if (_pendingAssignOrderId == null) return;
+
+if (state is AdminRiderOperationSuccess) {
+final riderName = _assigningRiderName ?? '';
+_pendingAssignOrderId = null;
+_assigningRiderName = null;
+
+ScaffoldMessenger.of(context).showSnackBar(
+SnackBar(
+content: Text('Order assigned to $riderName'),
+backgroundColor: const Color(0xFF0F7253),
+),
+);
+Navigator.of(context).pop();
+} else if (state is AdminRiderError) {
+_pendingAssignOrderId = null;
+_assigningRiderName = null;
+
+ScaffoldMessenger.of(context).showSnackBar(
+SnackBar(
+content: Text('Assignment failed: ${state.message}'),
+backgroundColor: Colors.red.shade700,
+),
+);
+}
 }
 
 // ============================================================

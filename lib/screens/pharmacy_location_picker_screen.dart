@@ -1,9 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
 
 class PharmacyLocationResult {
   const PharmacyLocationResult({
@@ -36,7 +35,7 @@ class PharmacyLocationPickerScreen extends StatefulWidget {
 
 class _PharmacyLocationPickerScreenState
     extends State<PharmacyLocationPickerScreen> {
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
 
   late LatLng _center;
   bool _isResolving = false;
@@ -124,8 +123,11 @@ class _PharmacyLocationPickerScreenState
     return display.isNotEmpty ? display : 'Selected location';
   }
 
-  void _moveTo(LatLng point) {
-    _mapController.move(point, _mapController.camera.zoom);
+  Future<void> _moveTo(LatLng point) async {
+    setState(() => _center = point);
+    await _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(CameraPosition(target: point, zoom: 17)),
+    );
     _reverseGeocode(point);
   }
 
@@ -149,23 +151,22 @@ class _PharmacyLocationPickerScreenState
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: 15,
-              onTap: (_, point) => _moveTo(point),
-              onMapEvent: (event) {
-                if (event is MapEventMoveEnd) _reverseGeocode(event.camera.center);
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.medscarrier.app',
-                maxZoom: 19,
+          Positioned.fill(
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _center,
+                zoom: 15,
               ),
-            ],
+              onMapCreated: (controller) {
+                _mapController = controller;
+              },
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              zoomControlsEnabled: true,
+              compassEnabled: true,
+              onTap: _moveTo,
+              onCameraIdle: () => _reverseGeocode(_center),
+            ),
           ),
 
           // Center pin
@@ -178,7 +179,9 @@ class _PharmacyLocationPickerScreenState
                   Icon(
                     Icons.location_on,
                     size: 44,
-                    color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
+                    color: isDark
+                        ? const Color(0xFF32C787)
+                        : const Color(0xFF0F7253),
                     shadows: [
                       Shadow(
                         color: Colors.black.withValues(alpha: 0.3),
@@ -240,9 +243,8 @@ class _PharmacyLocationPickerScreenState
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: _hasPicked
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
+                              fontWeight:
+                                  _hasPicked ? FontWeight.w600 : FontWeight.w400,
                               color: theme.colorScheme.onSurface,
                             ),
                           ),
@@ -350,8 +352,7 @@ class _PharmacyLocationPickerScreenState
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F7253),
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor:
-                            Colors.grey.withValues(alpha: 0.3),
+                        disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
                         disabledForegroundColor: Colors.grey,
                         elevation: 0,
                         shape: RoundedRectangleBorder(

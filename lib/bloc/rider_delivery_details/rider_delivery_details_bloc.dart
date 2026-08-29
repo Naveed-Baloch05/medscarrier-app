@@ -73,14 +73,46 @@ class RiderDeliveryDetailsBloc
   ) async {
     emit(RiderDeliveryDetailsLoading());
     await _orderSubscription?.cancel();
+
+    // Fallback so the details screen never hangs on loading if the real-time
+    // stream does not deliver its initial emission.
+    Timer? fallback;
+    bool gotEmission = false;
+
     _orderSubscription = _service.orderStream(event.orderId).listen((update) {
       if (!isClosed && update != null) {
+        gotEmission = true;
+        fallback?.cancel();
         _applyOrder(emit, order: update.order, pickupQrValue: update.pickupQrValue);
       }
     }, onError: (Object error) {
       if (!isClosed) {
-        emit(const RiderDeliveryDetailsError(
+        gotEmission = true;
+        fallback?.cancel();
+        emit(RiderDeliveryDetailsError(
           message: 'Unable to load order updates.',
+          order: _latestOrder,
+          pickupQrValue: _pickupQrValue,
+        ));
+      }
+    });
+
+    fallback = Timer(const Duration(seconds: 4), () async {
+      if (isClosed || gotEmission) return;
+      try {
+        final order = await _service.getOrder(event.orderId);
+        if (isClosed) return;
+        if (order == null) {
+          emit(RiderDeliveryDetailsError(message: 'Order not found.'));
+          return;
+        }
+        _applyOrder(emit, order: order);
+      } catch (error) {
+        if (isClosed) return;
+        emit(RiderDeliveryDetailsError(
+          message: error.toString().replaceFirst('Exception: ', ''),
+          order: _latestOrder,
+          pickupQrValue: _pickupQrValue,
         ));
       }
     });

@@ -179,6 +179,21 @@ class RiderMapService {
     });
   }
 
+  /// One-shot fetch used as a fallback so the map never hangs on loading when
+  /// the real-time stream does not deliver an initial emission.
+  Future<RiderMapSession> orderSessionOnce(String orderId) async {
+    if (orderId.trim().isEmpty) {
+      return RiderMapSession(order: OrderModel.noOp());
+    }
+    final doc = await _firestore.collection('orders').doc(orderId).get();
+    if (!doc.exists || doc.data() == null) {
+      return RiderMapSession(order: OrderModel.noOp());
+    }
+    final order = OrderModel.fromFirestore(doc);
+    final riderId = order.riderId ?? '';
+    return _buildSession(order, riderId);
+  }
+
   Future<RiderMapSession> _buildSession(OrderModel order, String riderId) async {
     if (order.id.isEmpty) {
       return RiderMapSession(order: order);

@@ -69,15 +69,26 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
   ) async {
     emit(const RiderMapLoading());
     await _mapSubscription?.cancel();
+
+    // Fallback so the map never hangs on the loading banner if the real-time
+    // stream does not deliver its initial emission (e.g. delayed snapshot,
+    // missing doc, or a stalled listener).
+    Timer? fallback;
+    bool gotEmission = false;
+
     _mapSubscription = _service.orderSessionStream(event.orderId).listen(
       (session) {
         if (!isClosed) {
+          gotEmission = true;
+          fallback?.cancel();
           if (session.order.id.isNotEmpty) _latestSession = session;
           emit(RiderMapLoaded(session));
         }
       },
       onError: (Object error) {
         if (!isClosed) {
+          gotEmission = true;
+          fallback?.cancel();
           emit(RiderMapError(
             message: _clean(error),
             session: _latestSession,
@@ -85,6 +96,24 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
         }
       },
     );
+
+    // If the real-time stream stalls, resolve the order once so the UI can
+    // render instead of remaining stuck on "Loading delivery…".
+    fallback = Timer(const Duration(seconds: 4), () async {
+      if (isClosed || gotEmission) return;
+      try {
+        final session = await _service.orderSessionOnce(event.orderId);
+        if (isClosed) return;
+        if (session.order.id.isNotEmpty) _latestSession = session;
+        emit(RiderMapLoaded(session));
+      } catch (error) {
+        if (isClosed) return;
+        emit(RiderMapError(
+          message: _clean(error),
+          session: _latestSession,
+        ));
+      }
+    });
   }
 
   Future<void> _onLoad(

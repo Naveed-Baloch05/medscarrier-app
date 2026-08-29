@@ -30,12 +30,18 @@ class PharmacyOrderAdded extends PharmacyOrdersEvent {
     required this.medicineCount,
     required this.status,
     required this.totalAmount,
+    this.deliveryAddress = '',
+    this.deliveryLat,
+    this.deliveryLng,
   });
 
   final String customerName;
   final int medicineCount;
   final String status;
   final double totalAmount;
+  final String deliveryAddress;
+  final double? deliveryLat;
+  final double? deliveryLng;
 }
 
 class PharmacyOrderUpdated extends PharmacyOrdersEvent {
@@ -60,7 +66,8 @@ class PharmacyOrderDeleted extends PharmacyOrdersEvent {
   final String id;
 }
 
-class PharmacyOrderStatusChanged extends PharmacyOrdersEvent {
+class PharmacyOrderStatusChanged
+    extends PharmacyOrdersEvent {
   const PharmacyOrderStatusChanged({
     required this.id,
     required this.newStatus,

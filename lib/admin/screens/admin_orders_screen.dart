@@ -8,6 +8,7 @@ import '../../bloc/admin_order/admin_order_state.dart';
 import '../../bloc/admin_rider/admin_rider_bloc.dart';
 import '../../bloc/admin_rider/admin_rider_event.dart';
 import '../../bloc/admin_rider/admin_rider_state.dart';
+import 'admin_rider_management_screen.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -42,6 +43,12 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     _orderBloc.close();
     _riderBloc.close();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> _ridersFromState(AdminRiderState state) {
+    if (state is AdminRiderLoaded) return state.riders;
+    if (state is AdminRiderLoadedWithApplications) return state.riders;
+    return const <Map<String, dynamic>>[];
   }
 
   List<Map<String, dynamic>> _mapOrders(
@@ -200,9 +207,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               final cardBg = isDark ? const Color(0xFF0E1A14) : Colors.white;
               final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
 
-              final riders = riderState is AdminRiderLoaded
-                  ? riderState.riders
-                  : const <Map<String, dynamic>>[];
+              final riders = _ridersFromState(riderState);
 
               final allOrders = orderState is AdminOrderLoaded
                   ? _mapOrders(orderState.orders, riders)
@@ -709,7 +714,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   child: SizedBox(
                     height: 42,
                     child: ElevatedButton.icon(
-                      onPressed: () => _showAssignRiderSheet(order),
+                      onPressed: () => _openAssignRider(context, order),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
@@ -725,7 +730,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 SizedBox(
                   height: 42,
                     child: OutlinedButton(
-                      onPressed: () => _autoAssignRider(order),
+                      onPressed: () => _autoAssignRider(context, order),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: primaryColor,
                         side: BorderSide(color: primaryColor.withValues(alpha: 0.5)),
@@ -874,187 +879,32 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   // ============================================================
-  // ASSIGN RIDER SHEET
+  // OPEN RIDER MANAGEMENT (assignment screen for this order)
   // ============================================================
 
-  void _showAssignRiderSheet(Map<String, dynamic> order) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
-    final textSecondary = isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75);
-    final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
-    final cardBg = isDark ? const Color(0xFF0E1A14) : Colors.white;
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
-
-    final riderState = context.read<AdminRiderBloc>().state;
-    final riders = riderState is AdminRiderLoaded
-        ? riderState.riders
-        : const <Map<String, dynamic>>[];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBg,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+  void _openAssignRider(BuildContext screenContext, Map<String, dynamic> order) {
+    Navigator.push(
+      screenContext,
+      MaterialPageRoute(
+        builder: (_) => AdminRiderManagementScreen(
+          orderId: order['id']?.toString() ?? '',
+          orderLabel: '${order['pharmacy']} → ${order['dropoff']}',
+        ),
       ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 15, 20, 25),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Assign Rider to ${order['id']}',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textPrimary),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  '${order['pharmacy']} → ${order['dropoff']}',
-                  style: TextStyle(fontSize: 12, color: textSecondary),
-                ),
-                const SizedBox(height: 18),
-                ...riders.map((rider) {
-                  final online = rider['online'] == true;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: online
-                              ? (isDark ? const Color(0xFF18251F) : const Color(0xFFE8F5E9))
-                              : Colors.grey.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.person_outline_rounded,
-                          color: online ? primaryColor : textSecondary,
-                          size: 22,
-                        ),
-                      ),
-                      title: Row(
-                        children: [
-                          Text(
-                            rider['name'],
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: online
-                                  ? (isDark ? const Color(0xFF1D322A) : const Color(0xFFE8F5E9))
-                                  : Colors.grey.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              online ? 'Online' : 'Offline',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: online ? primaryColor : textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        '${rider['deliveries']} deliveries · ${rider['location']}',
-                        style: TextStyle(fontSize: 11, color: textSecondary),
-                      ),
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: online ? primaryColor : textSecondary,
-                      ),
-                      onTap: online ? () {
-                        Navigator.pop(ctx);
-                        _confirmAssign(order, rider);
-                      } : null,
-                    ),
-                  );
-                }),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    ).then((_) {
+      if (!screenContext.mounted) return;
+      screenContext.read<AdminOrderBloc>().add(const AdminOrderRefreshed());
+      screenContext.read<AdminRiderBloc>().add(const AdminRiderRefreshed());
+    });
   }
 
-  void _confirmAssign(Map<String, dynamic> order, Map<String, dynamic> rider) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
-    final textSecondary = isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75);
+  void _autoAssignRider(BuildContext screenContext, Map<String, dynamic> order) {
+    _orderBloc.add(AdminOrderAutoAssigned(order['id'].toString()));
+
+    final isDark = Theme.of(screenContext).brightness == Brightness.dark;
     final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF0E1A14) : Colors.white,
-          title: Text('Confirm Assignment', style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
-          content: Text(
-            'Assign ${order['id']} to ${rider['name']}?',
-            style: TextStyle(color: textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: textSecondary)),
-            ),
-            TextButton(
-              onPressed: () {
-                context.read<AdminOrderBloc>().add(
-                  AdminOrderAssigned(
-                    order['id'].toString(),
-                    rider['id'].toString(),
-                  ),
-                );
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Assigned to ${rider['name']}'),
-                    backgroundColor: primaryColor,
-                  ),
-                );
-              },
-              child: Text('Assign', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w700)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _autoAssignRider(Map<String, dynamic> order) {
-    context.read<AdminOrderBloc>().add(
-      AdminOrderAutoAssigned(order['id'].toString()),
-    );
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253);
-
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(screenContext).showSnackBar(
       SnackBar(
         content: const Text('Auto-assignment in progress.'),
         backgroundColor: primaryColor,

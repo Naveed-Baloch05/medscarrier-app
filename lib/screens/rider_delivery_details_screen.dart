@@ -5,6 +5,7 @@ import '../bloc/rider_delivery_details/rider_delivery_details_bloc.dart';
 import '../bloc/rider_delivery_details/rider_delivery_details_event.dart';
 import '../bloc/rider_delivery_details/rider_delivery_details_state.dart';
 import '../models/order_model.dart';
+import 'rider_map_screen.dart';
 import 'rider_qr_scanner_screen.dart';
 
 class RiderDeliveryDetailsScreen extends StatefulWidget {
@@ -117,8 +118,9 @@ class _RiderDeliveryDetailsScreenState
         child: BlocBuilder<RiderDeliveryDetailsBloc, RiderDeliveryDetailsState>(
           bloc: _bloc,
           builder: (context, state) {
-          if (state is RiderDeliveryDetailsInitial ||
-              state is RiderDeliveryDetailsLoading) {
+          if ((state is RiderDeliveryDetailsInitial ||
+                  state is RiderDeliveryDetailsLoading) &&
+              widget.initialOrder == null) {
             return _buildLoading(context);
           }
 
@@ -129,7 +131,9 @@ class _RiderDeliveryDetailsScreenState
             return const _ErrorView(message: 'Order not loaded.');
           }
 
-          if (state is RiderDeliveryDetailsError && state.order == null) {
+          if (state is RiderDeliveryDetailsError &&
+              state.order == null &&
+              widget.initialOrder == null) {
             return _ErrorView(message: state.message);
           }
 
@@ -815,10 +819,7 @@ class _RiderDeliveryDetailsScreenState
           icon: Icons.navigation_outlined,
           label: 'Navigate to Pharmacy',
           onPressed: () {
-            _showNavigationMessage(
-              context,
-              'Opening navigation to pharmacy...',
-            );
+            _openRiderMap(context);
           },
         ),
 
@@ -864,10 +865,7 @@ class _RiderDeliveryDetailsScreenState
           icon: Icons.navigation_outlined,
           label: 'Navigate to Customer',
           onPressed: () {
-            _showNavigationMessage(
-              context,
-              'Opening navigation to customer...',
-            );
+            _openRiderMap(context);
           },
         ),
 
@@ -912,10 +910,7 @@ class _RiderDeliveryDetailsScreenState
           icon: Icons.navigation_outlined,
           label: 'Navigate to Customer',
           onPressed: () {
-            _showNavigationMessage(
-              context,
-              'Opening navigation to customer...',
-            );
+            _openRiderMap(context);
           },
         ),
 
@@ -1597,17 +1592,16 @@ class _RiderDeliveryDetailsScreenState
   }
 
   // ============================================================
-  // NAVIGATION MESSAGE
+  // OPEN EXISTING RIDER MAP
   // ============================================================
 
-  void _showNavigationMessage(
-    BuildContext context,
-    String message,
-  ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
+  void _openRiderMap(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RiderMapScreen(
+          riderId: _order.riderId ?? _orderId,
+          initialOrderId: _orderId,
+        ),
       ),
     );
   }
