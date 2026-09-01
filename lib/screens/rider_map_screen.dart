@@ -9,6 +9,7 @@ import '../bloc/rider_map/rider_map_bloc.dart';
 import '../bloc/rider_map/rider_map_event.dart';
 import '../bloc/rider_map/rider_map_state.dart';
 import '../core/services/rider_map_service.dart';
+import '../core/utils/route_utils.dart';
 import '../models/order_model.dart';
 
 class RiderMapScreen extends StatefulWidget {
@@ -26,12 +27,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   final List<Offset?> _signaturePoints = [];
 
   GoogleMapController? _mapController;
+  StreamSubscription<Position>? _positionSubscription;
   LatLng? _currentRiderLocation;
+  double? _currentHeading;
   bool _locationPermissionGranted = false;
   bool _isLoadingLocation = true;
   String? _locationError;
+  bool _hasInitiallyFitMap = false;
 
-  // Default fallback center (e.g. Islamabad / default coordinates)
+  // Default fallback center
   static const LatLng _defaultLocation = LatLng(33.6844, 73.0479);
 
   @override
@@ -53,13 +57,14 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
     _mapController?.dispose();
     _bloc.close();
     super.dispose();
   }
 
   // ============================================================
-  // LOCATION & PERMISSION HANDLING
+  // LOCATION & CONTINUOUS TRACKING
   // ============================================================
 
   Future<void> _initLocation() async {
@@ -93,7 +98,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         setState(() {
-          _locationError = 'Location permissions are permanently denied. Please enable them in system settings.';
+          _locationError =
+              'Location permissions are permanently denied. Please enable them in system settings.';
           _locationPermissionGranted = false;
           _isLoadingLocation = false;
         });
@@ -101,21 +107,66 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       }
 
       _locationPermissionGranted = true;
-      final position = await Geolocator.getCurrentPosition(
+
+      // Initial fast location fetch
+      try {
+        final initialPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+
+        if (mounted) {
+          final pos =
+              LatLng(initialPosition.latitude, initialPosition.longitude);
+          setState(() {
+            _currentRiderLocation = pos;
+            _currentHeading =
+                initialPosition.heading >= 0 ? initialPosition.heading : null;
+            _isLoadingLocation = false;
+          });
+          _bloc.add(RiderLocationUpdated(initialPosition));
+          _fitMapToPoints();
+        }
+      } catch (_) {
+        // Location stream below will deliver position
+      }
+
+      // Continuous position stream
+      await _positionSubscription?.cancel();
+      _positionSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
+          distanceFilter: 5,
         ),
+      ).listen(
+        (position) {
+          final pos = LatLng(position.latitude, position.longitude);
+          if (mounted) {
+            setState(() {
+              _currentRiderLocation = pos;
+              _currentHeading =
+                  position.heading >= 0 ? position.heading : null;
+              _isLoadingLocation = false;
+            });
+          }
+          _bloc.add(RiderLocationUpdated(position));
+
+          if (!_hasInitiallyFitMap) {
+            _hasInitiallyFitMap = true;
+            _fitMapToPoints();
+          }
+        },
+        onError: (e) {
+          if (mounted) {
+            setState(() {
+              _locationError = 'GPS stream error: $e';
+              _isLoadingLocation = false;
+            });
+          }
+        },
       );
-
-      if (mounted) {
-        setState(() {
-          _currentRiderLocation = LatLng(position.latitude, position.longitude);
-          _isLoadingLocation = false;
-        });
-
-        _fitMapToPoints();
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -130,18 +181,24 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     if (_currentRiderLocation != null && _mapController != null) {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(target: _currentRiderLocation!, zoom: 16.0),
+          CameraPosition(
+            target: _currentRiderLocation!,
+            zoom: 16.5,
+            bearing: _currentHeading ?? 0.0,
+            tilt: 30.0,
+          ),
         ),
       );
       if (mounted) {
-        _showMessage(context, 'Centered on your current location', isError: false);
+        _showMessage(context, 'Centered on your current location',
+            isError: false);
       }
     } else {
       await _initLocation();
       if (_currentRiderLocation != null && _mapController != null) {
         await _mapController!.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: _currentRiderLocation!, zoom: 16.0),
+            CameraPosition(target: _currentRiderLocation!, zoom: 16.5),
           ),
         );
       } else if (mounted && _locationError != null) {
@@ -153,20 +210,35 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   void _fitMapToPoints() {
     if (_mapController == null) return;
     final session = _sessionOf(_bloc.state);
+    final loadedState = _bloc.state is RiderMapLoaded
+        ? (_bloc.state as RiderMapLoaded)
+        : null;
 
     final points = <LatLng>[];
-    if (_currentRiderLocation != null) {
-      points.add(_currentRiderLocation!);
-    } else if (session?.riderLat != null && session?.riderLng != null) {
-      points.add(LatLng(session!.riderLat!, session.riderLng!));
+
+    // Include route points if available for tight bounds
+    if (loadedState != null && loadedState.selectedRoute != null) {
+      final routePts = loadedState.selectedRoute!.points;
+      if (routePts.isNotEmpty) {
+        points.add(routePts.first);
+        points.add(routePts.last);
+      }
     }
 
-    if (session?.pickupLat != null && session?.pickupLng != null) {
-      points.add(LatLng(session!.pickupLat!, session.pickupLng!));
-    }
+    if (points.isEmpty) {
+      if (_currentRiderLocation != null) {
+        points.add(_currentRiderLocation!);
+      } else if (session?.riderLat != null && session?.riderLng != null) {
+        points.add(LatLng(session!.riderLat!, session.riderLng!));
+      }
 
-    if (session?.dropoffLat != null && session?.dropoffLng != null) {
-      points.add(LatLng(session!.dropoffLat!, session.dropoffLng!));
+      if (session?.pickupLat != null && session?.pickupLng != null) {
+        points.add(LatLng(session!.pickupLat!, session.pickupLng!));
+      }
+
+      if (session?.dropoffLat != null && session?.dropoffLng != null) {
+        points.add(LatLng(session!.dropoffLat!, session.dropoffLng!));
+      }
     }
 
     if (points.isEmpty) return;
@@ -174,7 +246,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     if (points.length == 1) {
       _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(target: points.first, zoom: 15.0),
+          CameraPosition(target: points.first, zoom: 15.5),
         ),
       );
       return;
@@ -198,14 +270,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     );
 
     _mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 70),
+      CameraUpdate.newLatLngBounds(bounds, 75),
     );
   }
 
-  // 0 = navigating, 1 = arrived, 2 = completed
+  // 0 = navigating to pickup, 1 = navigating to customer, 2 = arrived, 3 = completed
   int _stepFor(RiderMapSession session) {
-    if (session.order.isCompleted) return 2;
-    if (session.isArrived) return 1;
+    if (session.order.isCompleted) return 3;
+    if (session.isArrived) return 2;
+    if (session.isPickedUp) return 1;
     return 0;
   }
 
@@ -231,45 +304,89 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
               _showMessage(context, state.message, isError: false);
             } else if (state is RiderMapError && state.message.isNotEmpty) {
               _showMessage(context, state.message, isError: true);
-            } else if (state is RiderMapLoaded) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _fitMapToPoints();
-              });
+            } else if (state is RiderMapLoaded && state.routeError != null) {
+              _showMessage(context, state.routeError!, isError: true);
             }
           },
           child: SafeArea(
             child: Stack(
               children: [
                 Positioned.fill(child: _buildMapArea(context, isDark)),
+
+                // Top Navigation & Stage Header
                 Positioned(
                   top: 12,
                   left: 16,
                   right: 16,
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildMapButton(
-                        context,
-                        icon: Icons.arrow_back_rounded,
-                        onTap: () => Navigator.pop(context),
+                      Row(
+                        children: [
+                          _buildMapButton(
+                            context,
+                            icon: Icons.arrow_back_rounded,
+                            onTap: () => Navigator.pop(context),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: BlocBuilder<RiderMapBloc, RiderMapState>(
+                              bloc: _bloc,
+                              buildWhen: (p, c) =>
+                                  c is RiderMapLoaded ||
+                                  c is RiderMapUpdating ||
+                                  c is RiderMapOperationSuccess,
+                              builder: (context, state) {
+                                final step = _stepFor(
+                                    _sessionOf(state) ?? _emptySession());
+                                return _buildTopBar(
+                                    context, isDark, step, state);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: BlocBuilder<RiderMapBloc, RiderMapState>(
-                          bloc: _bloc,
-                          buildWhen: (p, c) =>
-                              c is RiderMapLoaded ||
-                              c is RiderMapUpdating ||
-                              c is RiderMapOperationSuccess,
-                          builder: (context, state) {
-                            final step = _stepFor(_sessionOf(state) ?? _emptySession());
-                            return _buildTopBar(context, isDark, step, state);
-                          },
-                        ),
+
+                      // Turn-by-Turn Maneuver Banner & Route Refresh status
+                      BlocBuilder<RiderMapBloc, RiderMapState>(
+                        bloc: _bloc,
+                        builder: (context, state) {
+                          if (state is RiderMapLoaded &&
+                              _isNavigating() &&
+                              state.session.hasOrder) {
+                            return _buildTurnByTurnBanner(
+                                context, isDark, state);
+                          }
+                          return const SizedBox.shrink();
+                        },
                       ),
                     ],
                   ),
                 ),
+
+                // Re-center button
                 if (_isNavigating()) _buildLocateButton(context),
+
+                // Alternate routes selector chips
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 300,
+                  child: BlocBuilder<RiderMapBloc, RiderMapState>(
+                    bloc: _bloc,
+                    builder: (context, state) {
+                      if (state is RiderMapLoaded &&
+                          state.routes.length > 1 &&
+                          _isNavigating()) {
+                        return _buildRouteSelectionChips(
+                            context, isDark, state);
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+
+                // Bottom card (Delivery stages / Arrived / Signature / Completed)
                 Positioned(
                   left: 16,
                   right: 16,
@@ -300,7 +417,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   RiderMapSession _emptySession() => RiderMapSession(order: OrderModel.noOp());
 
   // ============================================================
-  // GOOGLE MAP AREA
+  // GOOGLE MAP AREA & POLYLINES
   // ============================================================
 
   Widget _buildMapArea(BuildContext context, bool isDark) {
@@ -312,11 +429,10 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           c is RiderMapLoading,
       builder: (context, state) {
         final session = _sessionOf(state);
-        final order = session?.order;
-        final hasOrder = order != null && order.id.isNotEmpty;
+        final loadedState = state is RiderMapLoaded ? state : null;
 
-        final markers = _buildMarkers(session);
-        final polylines = _buildPolylines(session);
+        final markers = _buildMarkers(session, loadedState);
+        final polylines = _buildPolylines(session, loadedState);
 
         final initialTarget = _currentRiderLocation ??
             (session?.pickupLat != null && session?.pickupLng != null
@@ -330,7 +446,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             GoogleMap(
               initialCameraPosition: CameraPosition(
                 target: initialTarget,
-                zoom: 14.5,
+                zoom: 15.0,
               ),
               onMapCreated: (controller) {
                 _mapController = controller;
@@ -343,47 +459,26 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
               compassEnabled: true,
               markers: markers,
               polylines: polylines,
-              padding: const EdgeInsets.only(top: 80, bottom: 260),
+              padding: const EdgeInsets.only(top: 140, bottom: 280),
             ),
 
-            if (hasOrder && session != null && (session.distance != '—' || session.eta != '—'))
+            // Off-route / Recalculating Route Floating Badge
+            if (loadedState != null &&
+                (loadedState.isLoadingRoute || loadedState.isOffRoute))
               Positioned(
-                top: 70,
-                left: 16,
+                top: 120,
+                left: 20,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.route_outlined, size: 16, color: Color(0xFF7C4DFF)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${session.distance} • ${session.eta}',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            if (_isLoadingLocation && _currentRiderLocation == null)
-              Positioned(
-                top: 70,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
+                    color: Colors.black.withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 6),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                      ),
                     ],
                   ),
                   child: Row(
@@ -394,11 +489,99 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                         height: 12,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
+                          color: isDark
+                              ? const Color(0xFF32C787)
+                              : const Color(0xFF0F7253),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        loadedState.isOffRoute
+                            ? 'Off route • Recalculating…'
+                            : 'Optimizing road route…',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Destination Proximity Notice
+            if (loadedState != null &&
+                loadedState.isNearDestination &&
+                _isNavigating())
+              Positioned(
+                top: 120,
+                right: 20,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F7253),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 14, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'Near destination',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            if (_isLoadingLocation && _currentRiderLocation == null)
+              Positioned(
+                top: 80,
+                right: 16,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isDark
+                              ? const Color(0xFF32C787)
+                              : const Color(0xFF0F7253),
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text('Locating…', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                      const Text('Locating…',
+                          style: TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -406,25 +589,34 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
             if (_locationError != null && !_locationPermissionGranted)
               Positioned(
-                top: 70,
+                top: 80,
                 right: 16,
                 child: GestureDetector(
                   onTap: _initLocation,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade800,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 6,
+                        ),
                       ],
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.location_disabled, size: 13, color: Colors.white),
+                        Icon(Icons.location_disabled,
+                            size: 13, color: Colors.white),
                         SizedBox(width: 5),
-                        Text('Enable GPS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text('Enable GPS',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
                       ],
                     ),
                   ),
@@ -436,10 +628,11 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     );
   }
 
-  Set<Marker> _buildMarkers(RiderMapSession? session) {
+  Set<Marker> _buildMarkers(
+      RiderMapSession? session, RiderMapLoaded? loadedState) {
     final markers = <Marker>{};
 
-    // 1. Current Rider Position Marker
+    // 1. Current Rider Position Marker with live heading
     final riderPos = _currentRiderLocation ??
         (session?.riderLat != null && session?.riderLng != null
             ? LatLng(session!.riderLat!, session.riderLng!)
@@ -450,24 +643,31 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
         Marker(
           markerId: const MarkerId('rider_position'),
           position: riderPos,
+          rotation: _currentHeading ?? 0.0,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
           infoWindow: InfoWindow(
             title: session?.riderName != null && session!.riderName!.isNotEmpty
                 ? session.riderName
                 : 'Your Location',
-            snippet: 'Rider Current Position',
+            snippet: 'Rider Live Position',
           ),
         ),
       );
     }
 
-    // 2. Pharmacy Pickup Marker
+    // 2. Pharmacy Pickup Marker (Highlighted before pickup)
     if (session?.pickupLat != null && session?.pickupLng != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('pickup_location'),
           position: LatLng(session!.pickupLat!, session.pickupLng!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            session.isPickedUp
+                ? BitmapDescriptor.hueGreen
+                : BitmapDescriptor.hueAzure,
+          ),
           infoWindow: InfoWindow(
             title: 'Pickup: ${session.pharmacy}',
             snippet: session.pharmacyAddressText,
@@ -482,7 +682,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
         Marker(
           markerId: const MarkerId('dropoff_location'),
           position: LatLng(session!.dropoffLat!, session.dropoffLng!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueViolet),
           infoWindow: InfoWindow(
             title: 'Drop-off: ${session.customer}',
             snippet: session.customerAddressText,
@@ -494,37 +695,80 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     return markers;
   }
 
-  Set<Polyline> _buildPolylines(RiderMapSession? session) {
+  Set<Polyline> _buildPolylines(
+      RiderMapSession? session, RiderMapLoaded? loadedState) {
     final polylines = <Polyline>{};
-    final points = <LatLng>[];
 
+    if (loadedState != null && loadedState.routes.isNotEmpty) {
+      // Draw Alternative Routes first (underneath primary)
+      for (int i = 0; i < loadedState.routes.length; i++) {
+        if (i == loadedState.selectedRouteIndex) continue;
+        final route = loadedState.routes[i];
+
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('alt_route_$i'),
+            points: route.points,
+            color: const Color(0xFF9E9E9E).withValues(alpha: 0.8),
+            width: 4,
+            consumeTapEvents: true,
+            onTap: () {
+              _bloc.add(SelectRoute(i));
+            },
+            patterns: [PatternItem.dash(18), PatternItem.gap(8)],
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+        );
+      }
+
+      // Draw Selected Primary Route on top
+      final selected = loadedState.selectedRoute;
+      if (selected != null) {
+        polylines.add(
+          Polyline(
+            polylineId: const PolylineId('primary_road_route'),
+            points: selected.points,
+            color: session?.isPickedUp == true
+                ? const Color(0xFF7C4DFF)
+                : const Color(0xFF0F7253),
+            width: 6,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+        );
+      }
+      return polylines;
+    }
+
+    // Fallback straight-line polyline if routes not yet loaded
+    final points = <LatLng>[];
     final riderPos = _currentRiderLocation ??
         (session?.riderLat != null && session?.riderLng != null
             ? LatLng(session!.riderLat!, session.riderLng!)
             : null);
 
-    if (riderPos != null) {
-      points.add(riderPos);
-    }
+    if (riderPos != null) points.add(riderPos);
 
-    if (session?.pickupLat != null && session?.pickupLng != null) {
-      points.add(LatLng(session!.pickupLat!, session.pickupLng!));
-    }
-
-    if (session?.dropoffLat != null && session?.dropoffLng != null) {
-      points.add(LatLng(session!.dropoffLat!, session.dropoffLng!));
+    if (session != null && !session.isPickedUp) {
+      if (session.pickupLat != null && session.pickupLng != null) {
+        points.add(LatLng(session.pickupLat!, session.pickupLng!));
+      }
+    } else if (session != null) {
+      if (session.dropoffLat != null && session.dropoffLng != null) {
+        points.add(LatLng(session.dropoffLat!, session.dropoffLng!));
+      }
     }
 
     if (points.length >= 2) {
       polylines.add(
         Polyline(
-          polylineId: const PolylineId('delivery_path'),
+          polylineId: const PolylineId('delivery_path_fallback'),
           points: points,
-          color: const Color(0xFF7C4DFF),
+          color: const Color(0xFF7C4DFF).withValues(alpha: 0.7),
           width: 4,
           jointType: JointType.round,
-          startCap: Cap.roundCap,
-          endCap: Cap.roundCap,
         ),
       );
     }
@@ -532,7 +776,179 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     return polylines;
   }
 
-  Widget _buildMapButton(BuildContext context, {required IconData icon, required VoidCallback onTap}) {
+  // ============================================================
+  // TURN-BY-TURN INSTRUCTION BANNER
+  // ============================================================
+
+  Widget _buildTurnByTurnBanner(
+      BuildContext context, bool isDark, RiderMapLoaded state) {
+    final theme = Theme.of(context);
+    final maneuver = state.currentManeuver;
+    final maneuverIcon = RouteUtils.getManeuverIcon(maneuver?.maneuver);
+
+    final isPickupStage = !state.session.isPickedUp;
+    final stageColor =
+        isPickupStage ? const Color(0xFF0F7253) : const Color(0xFF7C4DFF);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: stageColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(maneuverIcon, color: stageColor, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  maneuver?.instruction ??
+                      (isPickupStage
+                          ? 'Head towards ${state.session.pharmacy}'
+                          : 'Head towards ${state.session.customer}'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  maneuver != null
+                      ? 'In ${maneuver.distanceText} • Route: ${state.selectedRoute?.summary ?? "Fastest"}'
+                      : (isPickupStage
+                          ? 'Pickup: ${state.session.pharmacyAddressText}'
+                          : 'Drop-off: ${state.session.customerAddressText}'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                state.activeEta,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: stageColor,
+                ),
+              ),
+              Text(
+                state.activeDistance,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // ALTERNATE ROUTE SELECTOR CHIPS
+  // ============================================================
+
+  Widget _buildRouteSelectionChips(
+      BuildContext context, bool isDark, RiderMapLoaded state) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(state.routes.length, (index) {
+          final route = state.routes[index];
+          final isSelected = index == state.selectedRouteIndex;
+
+          return GestureDetector(
+            onTap: () => _bloc.add(SelectRoute(index)),
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? (isDark ? const Color(0xFF1D322A) : const Color(0xFF0F7253))
+                    : Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF32C787)
+                      : (isDark ? Colors.white12 : Colors.black12),
+                  width: isSelected ? 1.5 : 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.alt_route_rounded,
+                    size: 15,
+                    color: isSelected
+                        ? Colors.white
+                        : (isDark ? Colors.grey : Colors.grey.shade700),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${route.summary} • ${route.durationText}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildMapButton(BuildContext context,
+      {required IconData icon, required VoidCallback onTap}) {
     final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
@@ -546,7 +962,11 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
           child: Icon(icon, size: 21),
@@ -571,8 +991,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   // TOP BAR
   // ============================================================
 
-  Widget _buildTopBar(BuildContext context, bool isDark, int step, RiderMapState state) {
+  Widget _buildTopBar(
+      BuildContext context, bool isDark, int step, RiderMapState state) {
     final theme = Theme.of(context);
+
+    final statusColor = step == 3
+        ? const Color(0xFF32C787)
+        : (step == 2
+            ? const Color(0xFFE8A920)
+            : (step == 1 ? const Color(0xFF7C4DFF) : const Color(0xFF0F7253)));
 
     return Container(
       height: 46,
@@ -593,20 +1020,21 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           Icon(
             Icons.map_outlined,
             size: 19,
-            color: isDark ? const Color(0xFF32C787) : const Color(0xFF0F7253),
+            color: statusColor,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _topBarTitle(step, state),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           Container(
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: step == 2 ? const Color(0xFF32C787) : const Color(0xFF7C4DFF),
+              color: statusColor,
               shape: BoxShape.circle,
             ),
           ),
@@ -615,8 +1043,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             _topBarBadge(step),
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: step == 2 ? const Color(0xFF32C787) : const Color(0xFF7C4DFF),
+              fontWeight: FontWeight.w700,
+              color: statusColor,
             ),
           ),
         ],
@@ -628,28 +1056,36 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     if (state is RiderMapLoading) return 'Loading delivery…';
     if (_sessionOf(state)?.order.id.isEmpty == true) return 'No active delivery';
     switch (step) {
+      case 0:
+        return 'Pickup from Pharmacy';
       case 1:
-        return 'Arrived at Customer';
+        return 'Navigating to Customer';
       case 2:
+        return 'Arrived at Customer';
+      case 3:
         return 'Delivery Completed';
       default:
-        return 'Navigating to Customer';
+        return 'Active Route';
     }
   }
 
   String _topBarBadge(int step) {
     switch (step) {
+      case 0:
+        return 'To Pickup';
       case 1:
-        return 'Arrived';
+        return 'On the way';
       case 2:
+        return 'Arrived';
+      case 3:
         return 'Done';
       default:
-        return 'On the way';
+        return 'Active';
     }
   }
 
   // ============================================================
-  // BOTTOM CARD
+  // BOTTOM CARD (STAGE AWARE)
   // ============================================================
 
   Widget _buildBottom(RiderMapState state, bool isDark, BuildContext context) {
@@ -661,7 +1097,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(22),
           ),
-          child: const Text('Loading delivery…', style: TextStyle(fontWeight: FontWeight.w600)),
+          child: const Text('Loading delivery…',
+              style: TextStyle(fontWeight: FontWeight.w600)),
         ),
       );
     }
@@ -672,9 +1109,9 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     }
 
     final step = _stepFor(session);
-    if (step == 2) return _buildCompletedCard(context, isDark, session);
-    if (step == 1) return _buildArrivedCard(context, isDark, session);
-    return _buildDeliveryBottomCard(context, isDark, session);
+    if (step == 3) return _buildCompletedCard(context, isDark, session);
+    if (step == 2) return _buildArrivedCard(context, isDark, session);
+    return _buildDeliveryBottomCard(context, isDark, session, state);
   }
 
   Widget _buildEmptyCard(BuildContext context, bool isDark) {
@@ -684,9 +1121,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04)),
+        border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.04)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 6)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 6)),
         ],
       ),
       child: Column(
@@ -699,7 +1142,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
               color: const Color(0xFF32C787).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.delivery_dining_outlined, size: 32, color: Color(0xFF0F7253)),
+            child: const Icon(Icons.delivery_dining_outlined,
+                size: 32, color: Color(0xFF0F7253)),
           ),
           const SizedBox(height: 14),
           const Text(
@@ -710,7 +1154,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           Text(
             "You don't have an assigned delivery right now. New orders assigned to you will appear here.",
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+            style: TextStyle(
+                fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -718,20 +1163,33 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   }
 
   // ============================================================
-  // STEP 1: NAVIGATING TO CUSTOMER
+  // STEP 1 & 2: ACTIVE DELIVERY BOTTOM CARD
   // ============================================================
 
-  Widget _buildDeliveryBottomCard(BuildContext context, bool isDark, RiderMapSession session) {
+  Widget _buildDeliveryBottomCard(BuildContext context, bool isDark,
+      RiderMapSession session, RiderMapState state) {
     final theme = Theme.of(context);
+    final isPickupStage = !session.isPickedUp;
+
+    final distanceDisplay =
+        state is RiderMapLoaded ? state.activeDistance : session.distance;
+    final etaDisplay =
+        state is RiderMapLoaded ? state.activeEta : session.eta;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04)),
+        border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.04)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 6)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 6)),
         ],
       ),
       child: Column(
@@ -740,22 +1198,37 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(_orderLabel(session.order.id), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text(_orderLabel(session.order.id),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800)),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7C4DFF).withValues(alpha: 0.10),
+                  color: isPickupStage
+                      ? const Color(0xFF0F7253).withValues(alpha: 0.10)
+                      : const Color(0xFF7C4DFF).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.circle, size: 7, color: Color(0xFF7C4DFF)),
+                    Icon(Icons.circle,
+                        size: 7,
+                        color: isPickupStage
+                            ? const Color(0xFF0F7253)
+                            : const Color(0xFF7C4DFF)),
                     const SizedBox(width: 5),
                     Text(
                       _statusLabel(session.order.status),
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF7C4DFF)),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isPickupStage
+                            ? const Color(0xFF0F7253)
+                            : const Color(0xFF7C4DFF),
+                      ),
                     ),
                   ],
                 ),
@@ -767,8 +1240,10 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
           _buildLocationRow(
             icon: Icons.storefront,
-            iconColor: const Color(0xFF32C787),
-            title: 'PICKUP',
+            iconColor: isPickupStage
+                ? const Color(0xFF0F7253)
+                : Colors.grey.shade500,
+            title: 'PICKUP ${isPickupStage ? "(CURRENT STAGE)" : ""}',
             name: session.pharmacy,
             address: session.pharmacyAddressText,
           ),
@@ -790,8 +1265,10 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
           _buildLocationRow(
             icon: Icons.location_on_outlined,
-            iconColor: const Color(0xFF7C4DFF),
-            title: 'DROP-OFF',
+            iconColor: !isPickupStage
+                ? const Color(0xFF7C4DFF)
+                : Colors.grey.shade500,
+            title: 'DROP-OFF ${!isPickupStage ? "(CURRENT STAGE)" : ""}',
             name: session.customer,
             address: session.customerAddressText,
           ),
@@ -801,7 +1278,8 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 11),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F1814) : const Color(0xFFF6F8F7),
+              color:
+                  isDark ? const Color(0xFF0F1814) : const Color(0xFFF6F8F7),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -809,19 +1287,28 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 Expanded(
                   child: Column(
                     children: [
-                      Text(session.distance, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      Text(distanceDisplay,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 2),
-                      const Text('Distance', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      const Text('Road Distance',
+                          style: TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                 ),
-                Container(width: 1, height: 28, color: Colors.grey.withValues(alpha: 0.20)),
+                Container(
+                    width: 1,
+                    height: 28,
+                    color: Colors.grey.withValues(alpha: 0.20)),
                 Expanded(
                   child: Column(
                     children: [
-                      Text(session.eta, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      Text(etaDisplay,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 2),
-                      const Text('Estimated time', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      const Text('Traffic ETA',
+                          style: TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -842,10 +1329,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 backgroundColor: const Color(0xFF0F7253),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.location_on_outlined, size: 19),
-              label: const Text('Arrived at Customer', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              label: Text(
+                isPickupStage ? 'Arrived at Pharmacy' : 'Arrived at Customer',
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w800),
+              ),
             ),
           ),
 
@@ -857,12 +1349,17 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             child: OutlinedButton(
               onPressed: () => _showDeliveryInformation(context, session),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                side: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.black12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11)),
               ),
               child: Text(
                 'View Delivery Details',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface),
               ),
             ),
           ),
@@ -872,10 +1369,11 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   }
 
   // ============================================================
-  // STEP 2: ARRIVED – CUSTOMER NAME + SIGNATURE
+  // STEP 3: ARRIVED – CUSTOMER NAME + SIGNATURE
   // ============================================================
 
-  Widget _buildArrivedCard(BuildContext context, bool isDark, RiderMapSession session) {
+  Widget _buildArrivedCard(
+      BuildContext context, bool isDark, RiderMapSession session) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -884,9 +1382,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04)),
+        border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.04)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 6)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 6)),
         ],
       ),
       child: Column(
@@ -895,10 +1399,13 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(_orderLabel(session.order.id), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text(_orderLabel(session.order.id),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800)),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8A920).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
@@ -908,7 +1415,11 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                   children: [
                     Icon(Icons.circle, size: 7, color: Color(0xFFE8A920)),
                     SizedBox(width: 5),
-                    Text('Arrived', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFE8A920))),
+                    Text('Arrived',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFE8A920))),
                   ],
                 ),
               ),
@@ -932,28 +1443,43 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                     color: isDark ? const Color(0xFF1D322A) : Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.person_rounded, size: 22, color: Color(0xFF0F7253)),
+                  child: const Icon(Icons.person_rounded,
+                      size: 22, color: Color(0xFF0F7253)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Customer', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
+                      const Text('Customer',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w600)),
                       const SizedBox(height: 2),
-                      Text(session.customer, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      Text(session.customer,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
-                      Text(session.customerAddressText, style: TextStyle(fontSize: 11, color: Colors.grey.shade600), overflow: TextOverflow.ellipsis),
+                      Text(session.customerAddressText,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600),
+                          overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF32C787).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text('Delivering', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF32C787))),
+                  child: const Text('Delivering',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF32C787))),
                 ),
               ],
             ),
@@ -963,12 +1489,20 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
           Row(
             children: [
-              Text('Customer Signature', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onSurface)),
+              Text('Customer Signature',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface)),
               const Spacer(),
               if (_signaturePoints.isNotEmpty)
                 GestureDetector(
                   onTap: () => setState(() => _signaturePoints.clear()),
-                  child: Text('Clear', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade400)),
+                  child: Text('Clear',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red.shade400)),
                 ),
             ],
           ),
@@ -994,9 +1528,16 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.draw_outlined, size: 28, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                        Icon(Icons.draw_outlined,
+                            size: 28,
+                            color:
+                                cs.onSurfaceVariant.withValues(alpha: 0.4)),
                         const SizedBox(height: 4),
-                        Text('Tap and draw to sign', style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.5))),
+                        Text('Tap and draw to sign',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant
+                                    .withValues(alpha: 0.5))),
                       ],
                     ),
                   )
@@ -1031,7 +1572,10 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 'Customer must sign before completing delivery',
-                style: TextStyle(fontSize: 10, color: Colors.orange.shade700, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.orange.shade700,
+                    fontWeight: FontWeight.w500),
               ),
             ),
 
@@ -1052,10 +1596,13 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
                 disabledForegroundColor: Colors.grey,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.check_circle_outline, size: 19),
-              label: const Text('Complete Delivery', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              label: const Text('Complete Delivery',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
@@ -1076,22 +1623,25 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
         ));
   }
 
-  void _showMessage(BuildContext context, String message, {bool isError = false}) {
+  void _showMessage(BuildContext context, String message,
+      {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : const Color(0xFF0F7253),
+        backgroundColor:
+            isError ? Colors.red.shade700 : const Color(0xFF0F7253),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   // ============================================================
-  // STEP 3: DELIVERY COMPLETED
+  // STEP 4: DELIVERY COMPLETED
   // ============================================================
 
-  Widget _buildCompletedCard(BuildContext context, bool isDark, RiderMapSession session) {
+  Widget _buildCompletedCard(
+      BuildContext context, bool isDark, RiderMapSession session) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -1100,9 +1650,15 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04)),
+        border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.04)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 6)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 6)),
         ],
       ),
       child: Column(
@@ -1114,47 +1670,45 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
               color: const Color(0xFF32C787).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_circle_rounded, size: 40, color: Color(0xFF32C787)),
+            child: const Icon(Icons.check_circle_rounded,
+                size: 40, color: Color(0xFF32C787)),
           ),
-
           const SizedBox(height: 16),
-
           const Text(
             'Delivery Completed!',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
-
           const SizedBox(height: 6),
-
           Text(
             'Order ${_orderLabel(session.order.id)} has been delivered to ${session.customer}',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
           ),
-
           const SizedBox(height: 18),
-
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F1814) : const Color(0xFFF6F8F7),
+              color:
+                  isDark ? const Color(0xFF0F1814) : const Color(0xFFF6F8F7),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Column(
               children: [
-                _completedDetailRow(Icons.receipt_long_outlined, 'Order', _orderLabel(session.order.id)),
+                _completedDetailRow(Icons.receipt_long_outlined, 'Order',
+                    _orderLabel(session.order.id)),
                 const SizedBox(height: 10),
-                _completedDetailRow(Icons.person_outline, 'Customer', session.customer),
+                _completedDetailRow(
+                    Icons.person_outline, 'Customer', session.customer),
                 const SizedBox(height: 10),
-                _completedDetailRow(Icons.location_on_outlined, 'Address', session.customerAddressText),
+                _completedDetailRow(Icons.location_on_outlined, 'Address',
+                    session.customerAddressText),
                 const SizedBox(height: 10),
-                _completedDetailRow(Icons.timer_outlined, 'Delivery Time', _deliveryTime(session)),
+                _completedDetailRow(Icons.timer_outlined, 'Delivery Time',
+                    _deliveryTime(session)),
               ],
             ),
           ),
-
           const SizedBox(height: 18),
-
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -1164,10 +1718,13 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 backgroundColor: const Color(0xFF0F7253),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.home_outlined, size: 19),
-              label: const Text('Back to Home', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              label: const Text('Back to Home',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
@@ -1199,7 +1756,10 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         const Spacer(),
         Flexible(
-          child: Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+          child: Text(value,
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              overflow: TextOverflow.ellipsis),
         ),
       ],
     );
@@ -1209,13 +1769,20 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   // SHARED WIDGETS
   // ============================================================
 
-  Widget _buildLocationRow({required IconData icon, required Color iconColor, required String title, required String name, required String address}) {
+  Widget _buildLocationRow(
+      {required IconData icon,
+      required Color iconColor,
+      required String title,
+      required String name,
+      required String address}) {
     return Row(
       children: [
         Container(
           width: 34,
           height: 34,
-          decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.10), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.10),
+              shape: BoxShape.circle),
           child: Icon(icon, size: 17, color: iconColor),
         ),
         const SizedBox(width: 10),
@@ -1223,11 +1790,19 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.grey)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.grey)),
               const SizedBox(height: 2),
-              Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              Text(name,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
               const SizedBox(height: 1),
-              Text(address, style: const TextStyle(fontSize: 10, color: Colors.grey), overflow: TextOverflow.ellipsis),
+              Text(address,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
@@ -1235,14 +1810,16 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
     );
   }
 
-  void _showDeliveryInformation(BuildContext context, RiderMapSession session) {
+  void _showDeliveryInformation(
+      BuildContext context, RiderMapSession session) {
     final theme = Theme.of(context);
 
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.cardColor,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         return SafeArea(
           child: Padding(
@@ -1255,18 +1832,28 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                   child: Container(
                     width: 40,
                     height: 4,
-                    decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.30),
+                        borderRadius: BorderRadius.circular(4)),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text('Delivery Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const Text('Delivery Details',
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 18),
-                _buildBottomDetailRow(Icons.receipt_long_outlined, 'Order', _orderLabel(session.order.id)),
-                _buildBottomDetailRow(Icons.storefront, 'Pharmacy', session.pharmacy),
-                _buildBottomDetailRow(Icons.person_outline, 'Customer', session.customer),
-                _buildBottomDetailRow(Icons.location_on_outlined, 'Drop-off', session.customerAddressText),
-                _buildBottomDetailRow(Icons.route_outlined, 'Distance', session.distance),
-                _buildBottomDetailRow(Icons.access_time_outlined, 'ETA', session.eta),
+                _buildBottomDetailRow(Icons.receipt_long_outlined, 'Order',
+                    _orderLabel(session.order.id)),
+                _buildBottomDetailRow(
+                    Icons.storefront, 'Pharmacy', session.pharmacy),
+                _buildBottomDetailRow(
+                    Icons.person_outline, 'Customer', session.customer),
+                _buildBottomDetailRow(Icons.location_on_outlined, 'Drop-off',
+                    session.customerAddressText),
+                _buildBottomDetailRow(
+                    Icons.route_outlined, 'Distance', session.distance),
+                _buildBottomDetailRow(
+                    Icons.access_time_outlined, 'ETA', session.eta),
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
@@ -1277,9 +1864,11 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                       backgroundColor: const Color(0xFF0F7253),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text('Close',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -1298,7 +1887,9 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, size: 17, color: const Color(0xFF0F7253)),
           ),
           const SizedBox(width: 10),
@@ -1306,9 +1897,12 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                Text(title,
+                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
                 const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -1343,7 +1937,8 @@ class _SignaturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SignaturePainter oldDelegate) => oldDelegate.points != points;
+  bool shouldRepaint(covariant _SignaturePainter oldDelegate) =>
+      oldDelegate.points != points;
 }
 
 // ============================================================

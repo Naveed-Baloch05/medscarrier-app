@@ -46,6 +46,14 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        // Expose the configured Maps API key to Dart at runtime via
+        // BuildConfig so the Google Places / Geocoding HTTP calls use the
+        // SAME key as the map rendering (no --dart-define required).
+        buildConfigField("String", "MAPS_API_KEY", "\"${mapsApiKey.replace("\"", "\\\"")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

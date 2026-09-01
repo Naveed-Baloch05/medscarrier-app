@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:geolocator/geolocator.dart';
 
 abstract class RiderMapEvent extends Equatable {
   const RiderMapEvent();
@@ -32,6 +33,38 @@ class LoadMapOrder extends RiderMapEvent {
 
   @override
   List<Object?> get props => [riderId];
+}
+
+class RiderLocationUpdated extends RiderMapEvent {
+  const RiderLocationUpdated(this.position);
+
+  final Position position;
+
+  @override
+  List<Object?> get props => [
+        position.latitude,
+        position.longitude,
+        position.heading,
+        position.speed,
+      ];
+}
+
+class SelectRoute extends RiderMapEvent {
+  const SelectRoute(this.routeIndex);
+
+  final int routeIndex;
+
+  @override
+  List<Object?> get props => [routeIndex];
+}
+
+class RecalculateRoute extends RiderMapEvent {
+  const RecalculateRoute({this.force = false});
+
+  final bool force;
+
+  @override
+  List<Object?> get props => [force];
 }
 
 class MarkArrived extends RiderMapEvent {
