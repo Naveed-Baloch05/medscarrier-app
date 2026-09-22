@@ -30,6 +30,10 @@ class RiderMapLoaded extends RiderMapState {
     this.isLoadingRoute = false,
     this.routeError,
     this.isNearDestination = false,
+    this.currentStepIndex = 0,
+    this.distanceToNextManeuverMeters = 0,
+    this.liveRemainingDistanceMeters,
+    this.liveRemainingDurationSeconds,
   });
 
   final RiderMapSession session;
@@ -41,6 +45,10 @@ class RiderMapLoaded extends RiderMapState {
   final bool isLoadingRoute;
   final String? routeError;
   final bool isNearDestination;
+  final int currentStepIndex;
+  final int distanceToNextManeuverMeters;
+  final int? liveRemainingDistanceMeters;
+  final int? liveRemainingDurationSeconds;
 
   bool get isArrived => session.isArrived;
 
@@ -55,6 +63,9 @@ class RiderMapLoaded extends RiderMapState {
   }
 
   String get activeDistance {
+    if (liveRemainingDistanceMeters != null) {
+      return RouteStepModel.formatDistance(liveRemainingDistanceMeters!);
+    }
     final route = selectedRoute;
     if (route != null && route.distanceText.isNotEmpty) {
       return route.distanceText;
@@ -63,6 +74,9 @@ class RiderMapLoaded extends RiderMapState {
   }
 
   String get activeEta {
+    if (liveRemainingDurationSeconds != null) {
+      return RouteStepModel.formatDuration(liveRemainingDurationSeconds!);
+    }
     final route = selectedRoute;
     if (route != null && route.durationText.isNotEmpty) {
       return route.durationText;
@@ -70,7 +84,19 @@ class RiderMapLoaded extends RiderMapState {
     return session.eta;
   }
 
-  RouteStepModel? get currentManeuver => selectedRoute?.firstStep;
+  /// Current dynamic step maneuver based on vehicle progress along route
+  RouteStepModel? get currentManeuver {
+    final route = selectedRoute;
+    if (route == null || route.steps.isEmpty) return null;
+    if (currentStepIndex >= 0 && currentStepIndex < route.steps.length) {
+      return route.steps[currentStepIndex];
+    }
+    return route.steps.last;
+  }
+
+  /// Formatted distance to the next upcoming turn/maneuver
+  String get distanceToManeuverText =>
+      RouteStepModel.formatDistance(distanceToNextManeuverMeters);
 
   RiderMapLoaded copyWith({
     RiderMapSession? session,
@@ -82,6 +108,10 @@ class RiderMapLoaded extends RiderMapState {
     bool? isLoadingRoute,
     String? routeError,
     bool? isNearDestination,
+    int? currentStepIndex,
+    int? distanceToNextManeuverMeters,
+    int? liveRemainingDistanceMeters,
+    int? liveRemainingDurationSeconds,
   }) {
     return RiderMapLoaded(
       session: session ?? this.session,
@@ -93,6 +123,13 @@ class RiderMapLoaded extends RiderMapState {
       isLoadingRoute: isLoadingRoute ?? this.isLoadingRoute,
       routeError: routeError,
       isNearDestination: isNearDestination ?? this.isNearDestination,
+      currentStepIndex: currentStepIndex ?? this.currentStepIndex,
+      distanceToNextManeuverMeters:
+          distanceToNextManeuverMeters ?? this.distanceToNextManeuverMeters,
+      liveRemainingDistanceMeters:
+          liveRemainingDistanceMeters ?? this.liveRemainingDistanceMeters,
+      liveRemainingDurationSeconds:
+          liveRemainingDurationSeconds ?? this.liveRemainingDurationSeconds,
     );
   }
 
@@ -107,6 +144,10 @@ class RiderMapLoaded extends RiderMapState {
         isLoadingRoute,
         routeError,
         isNearDestination,
+        currentStepIndex,
+        distanceToNextManeuverMeters,
+        liveRemainingDistanceMeters,
+        liveRemainingDurationSeconds,
       ];
 }
 

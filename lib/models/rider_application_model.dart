@@ -9,6 +9,9 @@ class RiderApplicationModel {
     required this.phone,
     required this.vehicleType,
     required this.vehicleRegistrationNumber,
+    this.pharmacyId = '',
+    this.pharmacyName = '',
+    this.pharmacyCode = '',
     this.profilePhotoUrl,
     this.drivingLicenceFrontUrl,
     this.drivingLicenceBackUrl,
@@ -30,6 +33,9 @@ class RiderApplicationModel {
   final String phone;
   final String vehicleType;
   final String vehicleRegistrationNumber;
+  final String pharmacyId;
+  final String pharmacyName;
+  final String pharmacyCode;
   final String? profilePhotoUrl;
   final String? drivingLicenceFrontUrl;
   final String? drivingLicenceBackUrl;
@@ -55,6 +61,9 @@ class RiderApplicationModel {
       vehicleType: data['vehicleType'] as String? ?? '',
       vehicleRegistrationNumber:
           data['vehicleRegistrationNumber'] as String? ?? '',
+      pharmacyId: data['pharmacyId'] as String? ?? '',
+      pharmacyName: data['pharmacyName'] as String? ?? '',
+      pharmacyCode: data['pharmacyCode'] as String? ?? '',
       profilePhotoUrl: data['profilePhotoUrl'] as String?,
       drivingLicenceFrontUrl: data['drivingLicenceFrontUrl'] as String?,
       drivingLicenceBackUrl: data['drivingLicenceBackUrl'] as String?,
@@ -77,6 +86,9 @@ class RiderApplicationModel {
         'phone': phone,
         'vehicleType': vehicleType,
         'vehicleRegistrationNumber': vehicleRegistrationNumber,
+        'pharmacyId': pharmacyId,
+        'pharmacyName': pharmacyName,
+        'pharmacyCode': pharmacyCode,
         'profilePhotoUrl': profilePhotoUrl,
         'drivingLicenceFrontUrl': drivingLicenceFrontUrl,
         'drivingLicenceBackUrl': drivingLicenceBackUrl,

@@ -28,6 +28,7 @@ class RiderSignupBloc extends Bloc<RiderSignupEvent, RiderSignupState> {
         vehicleType: event.vehicleType,
         vehicleReg: event.vehicleReg,
         password: event.password,
+        pharmacyCode: event.pharmacyCode,
         licenseFront: event.licenseFront,
         licenseBack: event.licenseBack,
       );

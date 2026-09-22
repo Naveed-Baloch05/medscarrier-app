@@ -2194,7 +2194,7 @@ class _AdminPharmacyManagementScreenState
           ),
           content: Text(
             'Approve ${app.pharmacyName}\'s pharmacy application? '
-            'This will create their login account and send a password reset email.',
+            'This will activate their login account and send an approval confirmation email.',
             style: TextStyle(color: _secondaryText(isDark)),
           ),
           actions: [

@@ -133,6 +133,8 @@ class RiderLoginService {
       vehicleReg: data['vehicleReg'] as String? ??
           data['vehicleRegistrationNumber'] as String? ??
           '',
+      pharmacyId: data['pharmacyId'] as String? ?? '',
+      pharmacyName: data['pharmacyName'] as String? ?? '',
       online: data['online'] as bool? ?? false,
       active: active,
       location: data['location'] is Map

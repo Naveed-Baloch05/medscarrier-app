@@ -6,6 +6,7 @@ import '../bloc/rider_deliveries/rider_deliveries_bloc.dart';
 import '../bloc/rider_deliveries/rider_deliveries_event.dart';
 import '../bloc/rider_deliveries/rider_deliveries_state.dart';
 import '../models/order_model.dart';
+import 'rider_batch_scan_screen.dart';
 import 'rider_delivery_details_screen.dart';
 
 class RiderDeliveriesScreen extends StatefulWidget {
@@ -186,10 +187,40 @@ color: cs.onSurface,
 ),
 actions: [
 IconButton(
+icon: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF0F7253)),
+tooltip: 'Scan Delivery Box',
+onPressed: () {
+Navigator.push(
+context,
+MaterialPageRoute(
+builder: (_) => RiderBatchScanScreen(riderId: widget.riderId),
+),
+);
+},
+),
+IconButton(
 icon: Icon(Icons.refresh_rounded, color: cs.onSurface),
 onPressed: () => _bloc.add(RefreshRiderDeliveries(widget.riderId)),
 ),
 ],
+),
+
+floatingActionButton: FloatingActionButton.extended(
+onPressed: () {
+Navigator.push(
+context,
+MaterialPageRoute(
+builder: (_) => RiderBatchScanScreen(riderId: widget.riderId),
+),
+);
+},
+backgroundColor: const Color(0xFF0F7253),
+foregroundColor: Colors.white,
+icon: const Icon(Icons.qr_code_scanner),
+label: const Text(
+'Scan Box',
+style: TextStyle(fontWeight: FontWeight.w800),
+),
 ),
 
 body: BlocBuilder<RiderDeliveriesBloc, RiderDeliveriesState>(

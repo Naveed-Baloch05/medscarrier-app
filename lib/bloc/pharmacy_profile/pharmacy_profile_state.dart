@@ -28,6 +28,8 @@ class PharmacyProfileLoaded extends PharmacyProfileState {
       (data['businessAddress'] as String?) ?? '';
   String get gphcNumber =>
       (data['gphcNumber'] as String?) ?? '';
+  String get pharmacyCode =>
+      (data['pharmacyCode'] as String?) ?? (data['code'] as String?) ?? '';
   String get openingTime =>
       (data['openingTime'] as String?) ?? '09:00 AM';
   String get closingTime =>

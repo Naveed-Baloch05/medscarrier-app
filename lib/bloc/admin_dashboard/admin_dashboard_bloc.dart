@@ -135,7 +135,8 @@ class AdminDashboardBloc
   ) async {
     try {
       await _service.approvePharmacy(event.pharmacyId);
-      emit(const AdminDashboardActionSuccess('Pharmacy approved and password setup link sent.'));
+      emit(const AdminDashboardActionSuccess(
+          'Pharmacy approved and approval email sent.'));
       await _fetchAllData(emit);
     } catch (error) {
       emit(AdminDashboardError(
@@ -166,7 +167,7 @@ class AdminDashboardBloc
     try {
       await _service.approveRider(event.applicationId);
       emit(const AdminDashboardActionSuccess(
-          'Rider approved and password setup email sent.'));
+          'Rider approved and approval email sent.'));
       await _fetchAllData(emit);
     } catch (error) {
       emit(AdminDashboardError(

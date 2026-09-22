@@ -17,11 +17,59 @@ class PharmacyProfileService {
       _firestore.collection('pharmacies').doc(uid);
 
   Future<Map<String, dynamic>> getProfile(String uid) async {
+    final docPath = 'pharmacies/$uid';
     final doc = await _pharmacyDoc(uid).get();
-    if (!doc.exists || doc.data() == null) {
-      return {'uid': uid};
+    // ignore: avoid_print
+    print('[PROFILE-DEBUG] authUid=${_auth.currentUser?.uid} pharmacyId=$uid '
+        'doc=$docPath exists=${doc.exists} hasData=${doc.data() != null}');
+    final data = (doc.exists && doc.data() != null)
+        ? {'uid': uid, ...doc.data()!}
+        : {'uid': uid};
+
+    // If pharmacyCode is missing on the pharmacies document (e.g. a pharmacy
+    // created before pharmacyCode was written to pharmacies/{uid}), reuse the
+    // existing pharmacyCode stored elsewhere in Firebase. Never generate one.
+    final code = (data['pharmacyCode'] as String? ?? '').trim();
+    // ignore: avoid_print
+    print('[PROFILE-DEBUG] pharmacies.pharmacyCode=${code.isEmpty ? '<missing>' : code}');
+    if (code.isEmpty) {
+      final fallbackCode = await _findExistingPharmacyCode(uid);
+      // ignore: avoid_print
+      print('[PROFILE-DEBUG] fallback pharmacyCode=${fallbackCode.isEmpty ? '<missing>' : fallbackCode}');
+      if (fallbackCode.isNotEmpty) {
+        data['pharmacyCode'] = fallbackCode;
+      }
     }
-    return {'uid': uid, ...doc.data()!};
+
+    return data;
+  }
+
+  /// Reads an existing pharmacyCode from `users/{uid}` and then from the
+  /// matching `pharmacy_applications` document (by uid). Reuses the value the
+  /// registration flow already stored; never generates a new code.
+  Future<String> _findExistingPharmacyCode(String uid) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (userDoc.exists && userDoc.data() != null) {
+        final code = (userDoc.data()!['pharmacyCode'] as String? ?? '').trim();
+        if (code.isNotEmpty) return code;
+      }
+    } catch (_) {}
+
+    try {
+      final appQuery = await _firestore
+          .collection('pharmacy_applications')
+          .where('uid', isEqualTo: uid)
+          .limit(1)
+          .get();
+      if (appQuery.docs.isNotEmpty) {
+        final code =
+            (appQuery.docs.first.data()['pharmacyCode'] as String? ?? '').trim();
+        if (code.isNotEmpty) return code;
+      }
+    } catch (_) {}
+
+    return '';
   }
 
   Future<void> updateProfile({

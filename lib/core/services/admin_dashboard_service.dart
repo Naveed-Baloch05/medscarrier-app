@@ -5,6 +5,7 @@ import '../../models/pharmacy_model.dart';
 import '../../models/order_model.dart';
 import '../../models/rider_application_model.dart';
 import 'admin_notification_service.dart';
+import 'email_service.dart';
 
 class AdminDashboardService {
   AdminDashboardService._();
@@ -258,6 +259,21 @@ class AdminDashboardService {
     final riderEmail = (appData['email'] as String? ?? '').trim().toLowerCase();
     final riderName = (appData['fullName'] as String? ?? 'Rider').trim();
 
+    final pharmacyId = (appData['pharmacyId'] as String? ?? '').trim();
+    String pharmacyName = (appData['pharmacyName'] as String? ?? '').trim();
+
+    // Verify that the pharmacy still exists
+    if (pharmacyId.isNotEmpty) {
+      final pharmDoc = await _firestore.collection('pharmacies').doc(pharmacyId).get();
+      if (!pharmDoc.exists) {
+        throw Exception('The assigned pharmacy no longer exists.');
+      }
+      final pharmData = pharmDoc.data();
+      if (pharmData != null) {
+        pharmacyName = (pharmData['pharmacyName'] as String? ?? pharmData['name'] as String? ?? pharmacyName).trim();
+      }
+    }
+
     // Resolve the rider uid, creating the Firebase Auth user if necessary
     var riderUid = (appData['uid'] as String? ?? '').trim();
     if (riderUid.isEmpty) {
@@ -278,6 +294,8 @@ class AdminDashboardService {
       'reviewedAt': FieldValue.serverTimestamp(),
       'reviewedBy': adminUid,
       'uid': riderUid,
+      if (pharmacyId.isNotEmpty) 'pharmacyId': pharmacyId,
+      if (pharmacyName.isNotEmpty) 'pharmacyName': pharmacyName,
     });
 
     final userRef = _firestore.collection('users').doc(riderUid);
@@ -290,6 +308,8 @@ class AdminDashboardService {
       'role': 'rider',
       'vehicleType': appData['vehicleType'] ?? '',
       'vehicleRegistrationNumber': appData['vehicleRegistrationNumber'] ?? '',
+      if (pharmacyId.isNotEmpty) 'pharmacyId': pharmacyId,
+      if (pharmacyName.isNotEmpty) 'pharmacyName': pharmacyName,
       'profilePhotoUrl': appData['profilePhotoUrl'],
       'drivingLicenceFrontUrl': appData['drivingLicenceFrontUrl'],
       'drivingLicenceBackUrl': appData['drivingLicenceBackUrl'],
@@ -308,6 +328,8 @@ class AdminDashboardService {
       'phone': appData['phone'] ?? '',
       'vehicleType': appData['vehicleType'] ?? '',
       'vehicleReg': appData['vehicleRegistrationNumber'] ?? '',
+      'pharmacyId': pharmacyId,
+      'pharmacyName': pharmacyName,
       'status': 'Approved',
       'active': true,
       'online': false,
@@ -320,15 +342,20 @@ class AdminDashboardService {
 
     await batch.commit();
 
-    // Send password creation / setup link email to the rider
+    // Send rider approval confirmation email
     if (riderEmail.isNotEmpty) {
-      await _sendRiderPasswordResetEmail(riderEmail);
+      await EmailService.instance.sendRiderApprovalEmail(
+        email: riderEmail,
+        riderName: riderName,
+        uid: riderUid,
+      );
     }
 
     try {
       await AdminNotificationService.instance.createNotification(
         title: 'Rider Application Approved',
-        body: '$riderName application has been approved and a password setup link was sent to $riderEmail.',
+        body:
+            '$riderName application has been approved and an approval confirmation email was sent to $riderEmail.',
         type: 'rider',
         referenceId: applicationId,
       );
@@ -434,6 +461,7 @@ class AdminDashboardService {
     final data = appDoc.data()!;
     final email = (data['email'] as String? ?? '').trim().toLowerCase();
     final pharmacyName = data['pharmacyName'] as String? ?? 'Pharmacy';
+    final existingPharmacyCode = (data['pharmacyCode'] as String? ?? '').trim();
 
     String uid = (data['uid'] as String? ?? '').trim();
     if (uid.isEmpty && email.isNotEmpty) {
@@ -470,6 +498,7 @@ class AdminDashboardService {
         'businessAddress': data['businessAddress'] ?? '',
         'gphcNumber': data['gphcNumber'] ?? '',
         'licenseDocumentUrl': data['licenseDocumentUrl'] ?? '',
+        if (existingPharmacyCode.isNotEmpty) 'pharmacyCode': existingPharmacyCode,
         'status': 'Approved',
         'active': true,
         'createdAt': data['submittedAt'] ?? FieldValue.serverTimestamp(),
@@ -488,6 +517,7 @@ class AdminDashboardService {
         'email': email,
         'phone': data['phone'] ?? '',
         'role': 'pharmacy',
+        if (existingPharmacyCode.isNotEmpty) 'pharmacyCode': existingPharmacyCode,
         'accountStatus': 'active',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -497,16 +527,21 @@ class AdminDashboardService {
 
     await batch.commit();
 
-    // Send the password creation / reset link email to the pharmacy user
+    // Send the pharmacy approval confirmation email
     if (email.isNotEmpty) {
-      await _sendPasswordResetEmail(email);
+      await EmailService.instance.sendPharmacyApprovalEmail(
+        email: email,
+        pharmacyName: pharmacyName,
+        uid: uid,
+      );
     }
 
     // Add confirmation notification
     try {
       await AdminNotificationService.instance.createNotification(
         title: 'Pharmacy Application Approved',
-        body: '$pharmacyName has been approved and a password setup link was sent to $email.',
+        body:
+            '$pharmacyName has been approved and an approval confirmation email was sent to $email.',
         type: 'pharmacy',
         referenceId: applicationId,
       );
@@ -554,32 +589,6 @@ class AdminDashboardService {
       return null;
     } catch (_) {
       return null;
-    }
-  }
-
-  Future<void> _sendPasswordResetEmail(String email) async {
-    try {
-      final secondaryApp = await _getSecondaryApp();
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-      await secondaryAuth.sendPasswordResetEmail(email: email);
-      await secondaryAuth.signOut();
-    } catch (_) {
-      try {
-        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      } catch (_) {}
-    }
-  }
-
-  Future<void> _sendRiderPasswordResetEmail(String email) async {
-    try {
-      final secondaryApp = await _getRiderSecondaryApp();
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-      await secondaryAuth.sendPasswordResetEmail(email: email);
-      await secondaryAuth.signOut();
-    } catch (_) {
-      try {
-        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      } catch (_) {}
     }
   }
 

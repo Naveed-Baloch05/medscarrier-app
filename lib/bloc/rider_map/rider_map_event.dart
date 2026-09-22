@@ -1,11 +1,25 @@
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../models/delivery_route_model.dart';
 
 abstract class RiderMapEvent extends Equatable {
   const RiderMapEvent();
 
   @override
   List<Object?> get props => [];
+}
+
+/// Event to initialize map navigation directly for a batch route stop.
+class InitializeStopNavigation extends RiderMapEvent {
+  const InitializeStopNavigation(this.stop, {this.riderPosition, this.riderId});
+
+  final RouteStopModel stop;
+  final LatLng? riderPosition;
+  final String? riderId;
+
+  @override
+  List<Object?> get props => [stop.id, riderPosition, riderId];
 }
 
 class SubscribeToMap extends RiderMapEvent {
@@ -96,4 +110,15 @@ class CompleteDelivery extends RiderMapEvent {
         signaturePoints,
         medicineHandoverConfirmed,
       ];
+}
+
+/// Event to advance to the next batch stop without leaving the navigation screen
+class AdvanceToNextBatchStop extends RiderMapEvent {
+  const AdvanceToNextBatchStop(this.nextStop, {this.riderId});
+
+  final RouteStopModel nextStop;
+  final String? riderId;
+
+  @override
+  List<Object?> get props => [nextStop.id, riderId];
 }

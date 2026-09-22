@@ -9,6 +9,7 @@ import '../../bloc/admin_rider/admin_rider_bloc.dart';
 import '../../bloc/admin_rider/admin_rider_event.dart';
 import '../../bloc/admin_rider/admin_rider_state.dart';
 import 'admin_rider_management_screen.dart';
+import 'admin_order_details_screen.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -23,6 +24,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   String _selectedFilter = 'All';
   String _searchQuery = '';
+
+  List<Map<String, dynamic>> _rawOrders = const [];
 
   final List<String> _filters = [
     'All',
@@ -208,6 +211,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               final textPrimary = isDark ? Colors.white : const Color(0xFF191C1B);
 
               final riders = _ridersFromState(riderState);
+
+              _rawOrders = orderState is AdminOrderLoaded
+                  ? orderState.orders
+                  : const <Map<String, dynamic>>[];
 
               final allOrders = orderState is AdminOrderLoaded
                   ? _mapOrders(orderState.orders, riders)
@@ -746,7 +753,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               width: double.infinity,
               height: 42,
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: () => _openOrderDetails(context, order),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: textPrimary,
                   side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
@@ -896,6 +903,29 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       screenContext.read<AdminOrderBloc>().add(const AdminOrderRefreshed());
       screenContext.read<AdminRiderBloc>().add(const AdminRiderRefreshed());
     });
+  }
+
+  // ============================================================
+  // OPEN ORDER DETAILS (passes the ACTUAL selected order document)
+  // ============================================================
+  void _openOrderDetails(BuildContext screenContext, Map<String, dynamic> displayOrder) {
+    final String orderId = displayOrder['id']?.toString() ?? '';
+
+    // Prefer the raw Firestore order document so ALL real fields are shown.
+    Map<String, dynamic> selected = displayOrder;
+    for (final raw in _rawOrders) {
+      if (raw['id']?.toString() == orderId) {
+        selected = raw;
+        break;
+      }
+    }
+
+    Navigator.push(
+      screenContext,
+      MaterialPageRoute(
+        builder: (_) => AdminOrderDetailsScreen(order: selected),
+      ),
+    );
   }
 
   void _autoAssignRider(BuildContext screenContext, Map<String, dynamic> order) {

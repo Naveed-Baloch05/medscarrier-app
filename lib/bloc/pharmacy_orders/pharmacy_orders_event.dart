@@ -12,6 +12,12 @@ class PharmacyOrdersRefreshed extends PharmacyOrdersEvent {
   const PharmacyOrdersRefreshed();
 }
 
+class PharmacyOrdersStreamUpdated extends PharmacyOrdersEvent {
+  const PharmacyOrdersStreamUpdated(this.orders);
+
+  final List<dynamic> orders;
+}
+
 class PharmacyOrdersSearched extends PharmacyOrdersEvent {
   const PharmacyOrdersSearched(this.query);
 
@@ -33,6 +39,9 @@ class PharmacyOrderAdded extends PharmacyOrdersEvent {
     this.deliveryAddress = '',
     this.deliveryLat,
     this.deliveryLng,
+    this.customerPhone = '',
+    this.controlledDrug = false,
+    this.coldChain = false,
   });
 
   final String customerName;
@@ -42,6 +51,9 @@ class PharmacyOrderAdded extends PharmacyOrdersEvent {
   final String deliveryAddress;
   final double? deliveryLat;
   final double? deliveryLng;
+  final String customerPhone;
+  final bool controlledDrug;
+  final bool coldChain;
 }
 
 class PharmacyOrderUpdated extends PharmacyOrdersEvent {
@@ -66,17 +78,18 @@ class PharmacyOrderDeleted extends PharmacyOrdersEvent {
   final String id;
 }
 
-class PharmacyOrderStatusChanged
-    extends PharmacyOrdersEvent {
+class PharmacyOrderStatusChanged extends PharmacyOrdersEvent {
   const PharmacyOrderStatusChanged({
     required this.id,
     required this.newStatus,
     this.riderName = '',
     this.riderPhone = '',
+    this.riderId = '',
   });
 
   final String id;
   final String newStatus;
   final String riderName;
   final String riderPhone;
+  final String riderId;
 }

@@ -38,48 +38,21 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
     return (shortestSide / 420).clamp(0.85, 1.1);
   }
 
-  ThemeData scaledTheme({bool isDark = false}) => ThemeData(
-        brightness: isDark ? Brightness.dark : Brightness.light,
-        colorScheme: ColorScheme(
-          brightness: isDark ? Brightness.dark : Brightness.light,
-          primary: const Color(0xFF0F7253),
-          onPrimary: Colors.white,
-          secondary: const Color(0xFF0F7253),
-          onSecondary: Colors.white,
-          error: const Color(0xFFBA1A1A),
-          onError: Colors.white,
-          surface: isDark ? const Color(0xFF151E1A) : const Color(0xFFFFFFFF),
-          onSurface: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),
-          onSurfaceVariant:
-              isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
-        ),
-        scaffoldBackgroundColor:
-            isDark ? const Color(0xFF0B120E) : const Color(0xFFF2F5F3),
-      );
-
   @override
   Widget build(BuildContext context) {
     final scale = _scale(context);
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 600;
-    final parentIsDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Theme(
-      data: scaledTheme(isDark: parentIsDark),
+    return BlocProvider(
+      create: (_) => PharmacyLoginBloc(),
       child: Builder(
         builder: (context) {
-          final theme = Theme.of(context);
-          final cs = theme.colorScheme;
-          final isDark = theme.brightness == Brightness.dark;
-
-          return BlocProvider(
-            create: (_) => PharmacyLoginBloc(),
-            child: Builder(
-              builder: (context) {
-                return Scaffold(
-                  backgroundColor: isDark
-                      ? const Color(0xFF0C1310)
-                      : theme.scaffoldBackgroundColor,
+          return Scaffold(
+            backgroundColor: isDark ? const Color(0xFF0C1310) : theme.scaffoldBackgroundColor,
             body: SafeArea(
               child: BlocListener<PharmacyLoginBloc, PharmacyLoginState>(
                 listener: (context, state) {
@@ -306,10 +279,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> {
             ),
           );
         },
-        ),
-      );
-    },
-  ),
+      ),
     );
   }
 

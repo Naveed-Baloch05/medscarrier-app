@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -8,6 +9,7 @@ import '../bloc/pharmacy_orders/pharmacy_orders_state.dart';
 import '../widgets/pharmacy_order_card.dart';
 import '../widgets/pharmacy_order_filter.dart';
 import '../widgets/pharmacy_order_status_badge.dart';
+import 'pharmacy_live_tracking_screen.dart';
 import 'pharmacy_location_picker_screen.dart';
 
 class PharmacyOrdersScreen extends StatelessWidget {
@@ -182,6 +184,23 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                             return PharmacyOrderCard(
                               order: order,
                               onTap: () => _showOrderDetails(context, order),
+                              onTrackTap: order.canTrackLive
+                                  ? () {
+                                      final pharmacyId =
+                                          FirebaseAuth.instance.currentUser?.uid ?? '';
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => PharmacyLiveTrackingScreen(
+                                            pharmacyId: pharmacyId,
+                                            riderId: order.riderId,
+                                            riderName: order.riderName,
+                                            initialOrderId: order.docId,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  : null,
                             );
                           },
                         ),
@@ -292,7 +311,7 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
-                          value: status,
+                          initialValue: status,
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.flag_outlined),
                             border: OutlineInputBorder(
@@ -514,9 +533,59 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                       const SizedBox(height: 20),
                       _detailRow('Order ID', order.id, context),
                       _detailRow('Customer', order.customerName, context),
+                      if (order.customerPhone.isNotEmpty)
+                        _detailRow('Phone', order.customerPhone, context),
+                      if (order.deliveryAddress.isNotEmpty)
+                        _detailRow('Delivery Address', order.deliveryAddress, context),
                       _detailRow('Time', order.time, context),
                       _detailRow('Medicines', '${order.medicineCount}', context),
                       _detailRow('Total', '£${order.totalAmount.toStringAsFixed(2)}', context),
+
+                      if (order.isFailed && order.failureReason != null && order.failureReason!.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Delivery Failed',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Reason: ${order.failureReason}${order.failureNote != null && order.failureNote!.isNotEmpty ? " (${order.failureNote})" : ""}',
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Package is marked for return to pharmacy.',
+                                style: TextStyle(color: Colors.grey, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
                       if (order.items.isNotEmpty) ...[
                         const SizedBox(height: 16),
@@ -561,11 +630,48 @@ class _PharmacyOrdersViewState extends State<_PharmacyOrdersView> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(order.riderName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.blue.shade700)),
-                                    Text(order.riderPhone, style: TextStyle(fontSize: 11, color: Colors.blue.shade500)),
+                                    if (order.riderPhone.isNotEmpty)
+                                      Text(order.riderPhone, style: TextStyle(fontSize: 11, color: Colors.blue.shade500)),
                                   ],
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ],
+
+                      if (order.canTrackLive) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              final pharmacyId = FirebaseAuth.instance.currentUser?.uid ?? '';
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PharmacyLiveTrackingScreen(
+                                    pharmacyId: pharmacyId,
+                                    riderId: order.riderId,
+                                    riderName: order.riderName,
+                                    initialOrderId: order.docId,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.location_on_rounded, size: 20),
+                            label: const Text(
+                              'Live Track Rider & Deliveries',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F7253),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                            ),
                           ),
                         ),
                       ],

@@ -34,9 +34,9 @@ class PharmacyBottomNav extends StatelessWidget {
           label: 'Orders',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.medication_outlined),
-          activeIcon: Icon(Icons.medication_rounded),
-          label: 'Medicines',
+          icon: Icon(Icons.history_outlined),
+          activeIcon: Icon(Icons.history_rounded),
+          label: 'History',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.person_outline_rounded),

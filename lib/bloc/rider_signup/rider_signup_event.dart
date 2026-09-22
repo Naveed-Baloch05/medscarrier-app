@@ -12,6 +12,7 @@ class RiderSignupSubmitted extends RiderSignupEvent {
     required this.vehicleType,
     required this.vehicleReg,
     required this.password,
+    required this.pharmacyCode,
     this.licenseFront,
     this.licenseBack,
   });
@@ -22,6 +23,7 @@ class RiderSignupSubmitted extends RiderSignupEvent {
   final String vehicleType;
   final String vehicleReg;
   final String password;
+  final String pharmacyCode;
   final File? licenseFront;
   final File? licenseBack;
 }

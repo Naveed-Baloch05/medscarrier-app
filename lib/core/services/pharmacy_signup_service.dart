@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'admin_notification_service.dart';
@@ -89,6 +88,8 @@ class PharmacySignupService {
         } catch (_) {}
       }
 
+      final pharmacyCode = _generatePharmacyCode(pharmacyName.trim());
+
       // 3. Write application document
       final applicationData = <String, dynamic>{
         'applicationId': applicationId,
@@ -101,6 +102,7 @@ class PharmacySignupService {
         if (latitude != null && longitude != null)
           'location': GeoPoint(latitude, longitude),
         'gphcNumber': gphcNumber.trim(),
+        'pharmacyCode': pharmacyCode,
         if (docUrl != null) 'licenseDocumentUrl': docUrl,
         'status': 'pending',
         'accountCreated': false,
@@ -125,6 +127,7 @@ class PharmacySignupService {
             if (latitude != null && longitude != null)
               'location': GeoPoint(latitude, longitude),
             'gphcNumber': gphcNumber.trim(),
+            'pharmacyCode': pharmacyCode,
             if (docUrl != null) 'licenseDocumentUrl': docUrl,
             'applicationId': applicationId,
             'createdAt': FieldValue.serverTimestamp(),
@@ -141,6 +144,7 @@ class PharmacySignupService {
             if (latitude != null && longitude != null)
               'location': GeoPoint(latitude, longitude),
             'gphcNumber': gphcNumber.trim(),
+            'pharmacyCode': pharmacyCode,
             if (docUrl != null) 'licenseDocumentUrl': docUrl,
             'status': 'Pending',
             'active': false,
@@ -206,5 +210,12 @@ class PharmacySignupService {
       throw Exception('Upload succeeded but download URL is empty.');
     }
     return url;
+  }
+
+  String _generatePharmacyCode(String pharmacyName) {
+    final cleanName = pharmacyName.replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
+    final prefix = cleanName.length >= 3 ? cleanName.substring(0, 3) : cleanName.padRight(3, 'X');
+    final randomDigits = (1000 + (DateTime.now().microsecondsSinceEpoch % 9000)).toString();
+    return '$prefix-$randomDigits';
   }
 }

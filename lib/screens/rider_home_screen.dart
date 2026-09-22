@@ -1,10 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../bloc/rider_batch/rider_batch_bloc.dart';
+import '../bloc/rider_batch/rider_batch_event.dart';
+import '../bloc/rider_batch/rider_batch_state.dart';
 import '../bloc/rider_home/rider_home_bloc.dart';
 import '../bloc/rider_home/rider_home_event.dart';
 import '../bloc/rider_home/rider_home_state.dart';
+import '../core/services/rider_batch_service.dart';
+import '../models/delivery_route_model.dart';
 import '../models/order_model.dart';
+import 'rider_batch_active_screen.dart';
+import 'rider_batch_scan_screen.dart';
 import 'rider_deliveries_screen.dart';
 import 'rider_map_screen.dart';
 import 'rider_profile_screen.dart';
@@ -67,6 +77,12 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   late final RiderHomeBloc _bloc;
   bool _internalBloc = false;
 
+  GoogleMapController? _mapController;
+  LatLng? _currentRiderLocation;
+  StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<DeliveryRouteModel?>? _routeSubscription;
+  DeliveryRouteModel? _activeRoute;
+
   @override
   void initState() {
     super.initState();
@@ -76,14 +92,70 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       _internalBloc = true;
       _bloc = RiderHomeBloc()..add(LoadRiderHome(widget.riderId));
     }
+    _initLocationAndRoute();
   }
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
+    _routeSubscription?.cancel();
+    _mapController?.dispose();
     if (_internalBloc) {
       _bloc.close();
     }
     super.dispose();
+  }
+
+  Future<void> _initLocationAndRoute() async {
+    try {
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (mounted) {
+        setState(() {
+          _currentRiderLocation = LatLng(pos.latitude, pos.longitude);
+        });
+      }
+
+      await _positionSubscription?.cancel();
+      _positionSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 15,
+        ),
+      ).listen((p) {
+        if (mounted) {
+          setState(() {
+            _currentRiderLocation = LatLng(p.latitude, p.longitude);
+          });
+        }
+      });
+    } catch (_) {}
+
+    try {
+      final active =
+          await RiderBatchService.instance.getActiveRouteForRider(widget.riderId);
+      if (mounted && active != null) {
+        setState(() {
+          _activeRoute = active;
+        });
+      }
+    } catch (_) {}
+
+    await _routeSubscription?.cancel();
+    _routeSubscription = RiderBatchService.instance
+        .streamActiveRouteForRider(widget.riderId)
+        .listen((active) {
+      if (mounted) {
+        setState(() {
+          _activeRoute = active;
+        });
+      }
+    });
   }
 
   String _greeting() {
@@ -122,11 +194,23 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       value: _bloc,
       child: BlocBuilder<RiderHomeBloc, RiderHomeState>(
         builder: (context, state) {
-          return Scaffold(
+            return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
             body: SafeArea(
               child: _buildBody(context, state, isDark),
             ),
+            floatingActionButton: (_activeRoute != null && _activeRoute!.isActive)
+                ? null
+                : FloatingActionButton.extended(
+                    onPressed: () => _showCreateRouteModal(context),
+                    backgroundColor: const Color(0xFF0F7253),
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.add_road_rounded),
+                    label: const Text(
+                      '+ Create Route',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
             bottomNavigationBar: _buildBottomNav(context, isDark, theme),
           );
         },
@@ -227,6 +311,8 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(context, rider.fullName, rider.online, isDark),
+                const SizedBox(height: 12),
+                _buildMapHeroCard(context, isDark),
                 const SizedBox(height: 16),
                 _buildMetricsRow(
                   context,
@@ -234,7 +320,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                   distanceText,
                   timeOnRoad,
                 ),
-                if (activeOrder != null) ...[
+                if (activeOrder != null && (_activeRoute == null || !_activeRoute!.isActive)) ...[
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -248,7 +334,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Active delivery',
+                        'Assigned delivery',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -264,7 +350,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
           ),
         ),
 
-        if (activeOrder != null)
+        if (activeOrder != null && (_activeRoute == null || !_activeRoute!.isActive))
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             sliver: SliverToBoxAdapter(
@@ -345,6 +431,849 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
+  }
+
+  Widget _buildMapHeroCard(BuildContext context, bool isDark) {
+    final hasActiveRoute = _activeRoute != null;
+    final isRouteActive = hasActiveRoute && _activeRoute!.isActive;
+    final isRoutePlanning = hasActiveRoute &&
+        (_activeRoute!.status == 'draft' ||
+            _activeRoute!.status == 'building' ||
+            _activeRoute!.status == 'optimized');
+
+    final Set<Marker> markers = {};
+
+    if (_currentRiderLocation != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('current_rider_loc'),
+          position: _currentRiderLocation!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: const InfoWindow(title: 'Your Location'),
+        ),
+      );
+    }
+
+    if (hasActiveRoute) {
+      for (int i = 0; i < _activeRoute!.stops.length; i++) {
+        final stop = _activeRoute!.stops[i];
+        if (stop.latLng != null) {
+          markers.add(
+            Marker(
+              markerId: MarkerId('route_stop_${stop.id}'),
+              position: stop.latLng!,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                stop.isDelivered
+                    ? BitmapDescriptor.hueGreen
+                    : BitmapDescriptor.hueOrange,
+              ),
+              infoWindow: InfoWindow(
+                title: 'Stop #${stop.sequence}: ${stop.customerName}',
+                snippet: stop.address,
+              ),
+            ),
+          );
+        }
+      }
+    }
+
+    final gpsCoordText = _currentRiderLocation != null
+        ? '${_currentRiderLocation!.latitude.toStringAsFixed(4)}, ${_currentRiderLocation!.longitude.toStringAsFixed(4)}'
+        : 'Acquiring GPS...';
+
+    // Find the next pending stop on active route if available
+    RouteStopModel? nextPendingStop;
+    if (isRouteActive && _activeRoute!.stops.isNotEmpty) {
+      for (final s in _activeRoute!.stops) {
+        if (s.isPending) {
+          nextPendingStop = s;
+          break;
+        }
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131D18) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Google Map View
+            SizedBox(
+              height: hasActiveRoute ? 180 : 140,
+              width: double.infinity,
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _currentRiderLocation ?? const LatLng(33.6844, 73.0479),
+                      zoom: hasActiveRoute ? 13 : 14,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    markers: markers,
+                    onMapCreated: (ctrl) {
+                      _mapController = ctrl;
+                    },
+                  ),
+                  // GPS Live Badge
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.my_location, size: 12, color: Color(0xFF32C787)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'GPS: $gpsCoordText',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Recenter button
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: CircleAvatar(
+                      backgroundColor: isDark ? const Color(0xFF131D18) : Colors.white,
+                      radius: 16,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.crop_free, size: 18, color: Color(0xFF0F7253)),
+                        onPressed: () {
+                          if (_currentRiderLocation != null && _mapController != null) {
+                            _mapController!.animateCamera(
+                              CameraUpdate.newLatLngZoom(_currentRiderLocation!, 15),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // 2. Route Content & Workflow Actions
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isRouteActive) ...[
+                    // --- CASE A: ROUTE IN PROGRESS ---
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF32C787)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.circle, size: 8, color: Color(0xFF0F7253)),
+                              SizedBox(width: 5),
+                              Text(
+                                'ROUTE IN PROGRESS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F7253),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _activeRoute!.name,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${_activeRoute!.deliveredCount} / ${_activeRoute!.totalStops} Stops Completed',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          '${_activeRoute!.pendingCount} remaining',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? const Color(0xFF8B9B94) : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: _activeRoute!.totalStops > 0
+                            ? (_activeRoute!.deliveredCount / _activeRoute!.totalStops)
+                            : 0.0,
+                        minHeight: 7,
+                        backgroundColor: isDark ? Colors.white10 : Colors.grey.shade200,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF32C787)),
+                      ),
+                    ),
+                    if (nextPendingStop != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1B2A22) : const Color(0xFFF3FAF6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF32C787).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.near_me_rounded, size: 18, color: Color(0xFF0F7253)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Next: Stop #${nextPendingStop.sequence} \u2022 ${nextPendingStop.customerName}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    nextPendingStop.address,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (nextPendingStop.coldChain)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 6),
+                                child: Text('❄', style: TextStyle(fontSize: 14)),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RiderBatchActiveScreen(
+                                bloc: RiderBatchBloc()
+                                  ..add(ResumeActiveRoute(_activeRoute!)),
+                              ),
+                            ),
+                          ).then((_) => _initLocationAndRoute());
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F7253),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        icon: const Icon(Icons.navigation_rounded, size: 20),
+                        label: const Text(
+                          'RESUME ROUTE',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else if (isRoutePlanning) ...[
+                    // --- CASE B: ROUTE IN SETUP / PLANNING ---
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.amber.shade400),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.circle, size: 8, color: Colors.amber.shade900),
+                              const SizedBox(width: 5),
+                              Text(
+                                'ROUTE IN SETUP',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.amber.shade900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _activeRoute!.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${_activeRoute!.totalStops} Stops Added',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _activeRoute!.status == 'optimized'
+                          ? 'Route is optimized and ready to launch.'
+                          : 'Continue scanning medication packages to finalize stops.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (_activeRoute!.status == 'optimized') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RiderBatchActiveScreen(
+                                  bloc: RiderBatchBloc()
+                                    ..add(ResumeActiveRoute(_activeRoute!)),
+                                ),
+                              ),
+                            ).then((_) => _initLocationAndRoute());
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RiderBatchScanScreen(
+                                  riderId: widget.riderId,
+                                  route: _activeRoute,
+                                  pharmacyId: _activeRoute!.pharmacyId,
+                                  pharmacyName: _activeRoute!.pharmacyName,
+                                ),
+                              ),
+                            ).then((_) => _initLocationAndRoute());
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F7253),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: Icon(
+                          _activeRoute!.status == 'optimized'
+                              ? Icons.play_arrow_rounded
+                              : Icons.qr_code_scanner_rounded,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _activeRoute!.status == 'optimized'
+                              ? 'REVIEW & START ROUTE'
+                              : 'CONTINUE SCANNING',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // --- CASE C: NO ACTIVE ROUTE (READY TO START) ---
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.add_road_rounded,
+                            size: 24,
+                            color: Color(0xFF0F7253),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Ready for Delivery Shift',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Create a route, scan prescription packages, and get your optimized delivery stops.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFF8B9B94) : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showCreateRouteModal(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F7253),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        icon: const Icon(Icons.add_rounded, size: 20),
+                        label: const Text(
+                          'CREATE ROUTE',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateRouteModal(BuildContext context) {
+    final now = DateTime.now();
+    DateTime selectedDate = DateTime(now.year, now.month, now.day);
+    String dateSelection = 'Today';
+    bool carryPrevious = false;
+    final nameController = TextEditingController(
+      text: 'Route - ${_formatDateShort(now)}',
+    );
+
+    final homeNav = Navigator.of(context);
+    final homeMessenger = ScaffoldMessenger.of(context);
+    final batchBloc = RiderBatchBloc();
+    bool isNavigatingToScan = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return BlocProvider<RiderBatchBloc>.value(
+          value: batchBloc,
+          child: BlocConsumer<RiderBatchBloc, RiderBatchState>(
+            listener: (sheetCtx, state) {
+              if (state is RiderBatchScanning && state.route != null) {
+                isNavigatingToScan = true;
+                debugPrint('=== [NAVIGATING TO SCAN SCREEN] ===');
+                debugPrint('Route ID: ${state.route!.id}, Name: ${state.route!.name}');
+
+                if (mounted) {
+                  setState(() {
+                    _activeRoute = state.route;
+                  });
+                }
+
+                if (modalCtx.mounted) {
+                  Navigator.of(modalCtx).pop();
+                }
+
+                if (mounted) {
+                  homeNav.push(
+                    MaterialPageRoute(
+                      builder: (_) => RiderBatchScanScreen(
+                        riderId: widget.riderId,
+                        route: state.route,
+                        pharmacyId: state.pharmacyId ?? state.route?.pharmacyId,
+                        pharmacyName: state.pharmacyName ?? state.route?.pharmacyName,
+                        bloc: batchBloc,
+                      ),
+                    ),
+                  ).then((_) {
+                    batchBloc.close();
+                    if (mounted) _initLocationAndRoute();
+                  });
+                }
+              } else if (state is RiderBatchError) {
+                debugPrint('=== [CREATE ROUTE ERROR]: ${state.message} ===');
+                homeMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: Colors.red.shade700,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            builder: (sheetCtx, state) {
+              final isCreating = state is RiderBatchCreatingRoute;
+
+              return StatefulBuilder(
+                builder: (innerContext, setModalState) {
+                  final theme = Theme.of(innerContext);
+                  final isDark = theme.brightness == Brightness.dark;
+
+                  return Container(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      16,
+                      20,
+                      MediaQuery.of(innerContext).viewInsets.bottom + 24,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF131D18) : Colors.white,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade400,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F7253).withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.add_road_rounded, color: Color(0xFF0F7253), size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Create Delivery Route',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                                ),
+                                Text(
+                                  'Set up your run and scan delivery boxes',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Route Name
+                        const Text(
+                          'ROUTE NAME (OPTIONAL)',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: nameController,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Morning Delivery Run',
+                            filled: true,
+                            fillColor: isDark ? const Color(0xFF1C2A22) : const Color(0xFFF2F5F3),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Route Date Selector
+                        const Text(
+                          'ROUTE DATE',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                label: Center(
+                                  child: Text(
+                                    'Today (${_formatDateShort(now)})',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                selected: dateSelection == 'Today',
+                                selectedColor: const Color(0xFF0F7253),
+                                labelStyle: TextStyle(
+                                  color: dateSelection == 'Today'
+                                      ? Colors.white
+                                      : (isDark ? Colors.white70 : Colors.black87),
+                                ),
+                                onSelected: (val) {
+                                  if (val) {
+                                    setModalState(() {
+                                      dateSelection = 'Today';
+                                      selectedDate = DateTime(now.year, now.month, now.day);
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(
+                                  child: Text('Tomorrow', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                                selected: dateSelection == 'Tomorrow',
+                                selectedColor: const Color(0xFF0F7253),
+                                labelStyle: TextStyle(
+                                  color: dateSelection == 'Tomorrow'
+                                      ? Colors.white
+                                      : (isDark ? Colors.white70 : Colors.black87),
+                                ),
+                                onSelected: (val) {
+                                  if (val) {
+                                    final tomorrow = now.add(const Duration(days: 1));
+                                    setModalState(() {
+                                      dateSelection = 'Tomorrow';
+                                      selectedDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: innerContext,
+                                initialDate: selectedDate,
+                                firstDate: now.subtract(const Duration(days: 7)),
+                                lastDate: now.add(const Duration(days: 60)),
+                              );
+                              if (picked != null) {
+                                setModalState(() {
+                                  dateSelection = 'Custom';
+                                  selectedDate = picked;
+                                });
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: dateSelection == 'Custom' ? const Color(0xFF0F7253) : Colors.grey,
+                              side: BorderSide(
+                                color: dateSelection == 'Custom' ? const Color(0xFF0F7253) : Colors.grey.shade400,
+                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.calendar_month, size: 16),
+                            label: Text(
+                              dateSelection == 'Custom'
+                                  ? 'Selected Date: ${_formatDateShort(selectedDate)}'
+                                  : 'Pick a Specific Date',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Carry Previous Stops
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Carry Previous Stops', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          subtitle: const Text('Include pending stops from earlier runs', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          value: carryPrevious,
+                          activeTrackColor: const Color(0xFF0F7253),
+                          onChanged: (val) {
+                            setModalState(() {
+                              carryPrevious = val;
+                            });
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Confirm Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: isCreating
+                                ? null
+                                : () {
+                                    final riderId = widget.riderId.trim();
+                                    if (riderId.isEmpty) {
+                                      homeMessenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Cannot create route: Rider ID is missing.'),
+                                          backgroundColor: Colors.red,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final rawName = nameController.text.trim();
+                                    final routeName = rawName.isNotEmpty
+                                        ? rawName
+                                        : 'Route - ${_formatDateShort(selectedDate)}';
+
+                                    debugPrint('=== [CONFIRM & START SCANNING TAPPED] ===');
+                                    debugPrint('Rider: $riderId, Name: $routeName, Date: $selectedDate, Carry: $carryPrevious');
+
+                                    batchBloc.add(
+                                      CreateNewRoute(
+                                        riderId: riderId,
+                                        date: selectedDate,
+                                        name: routeName,
+                                        startLocation: _currentRiderLocation,
+                                        carryPreviousStops: carryPrevious,
+                                      ),
+                                    );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F7253),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                            ),
+                            child: isCreating
+                                ? const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Creating Route...',
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                                      ),
+                                    ],
+                                  )
+                                : const Text(
+                                    'Confirm & Start Scanning',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    ).then((_) {
+      if (!isNavigatingToScan && !batchBloc.isClosed) {
+        batchBloc.close();
+      }
+    });
+  }
+
+  static String _formatDateShort(DateTime dt) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[dt.month - 1]} ${dt.day}';
   }
 
   Widget _buildHeader(
@@ -958,10 +1887,40 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       onTap: (index) {
         if (index == 0) return;
         if (index == 1) {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => RiderMapScreen(
+          // Tab 1: In-App Map / Navigation
+          if (_activeRoute != null &&
+              (_activeRoute!.isActive ||
+                  _activeRoute!.status == 'optimized' ||
+                  _activeRoute!.status == 'in_progress')) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RiderBatchActiveScreen(
+                  bloc: RiderBatchBloc()..add(ResumeActiveRoute(_activeRoute!)),
+                ),
+              ),
+            ).then((_) => _initLocationAndRoute());
+            return;
+          }
+
+          final homeState = context.read<RiderHomeBloc>().state;
+          String? activeOrderId;
+          if (homeState is RiderHomeLoaded) {
+            try {
+              final activeOrder = homeState.orders.firstWhere((o) => o.isActive);
+              activeOrderId = activeOrder.id;
+            } catch (_) {}
+          }
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RiderMapScreen(
                 riderId: widget.riderId,
-              )));
+                initialOrderId: activeOrderId,
+              ),
+            ),
+          ).then((_) => _initLocationAndRoute());
           return;
         }
         if (index == 2) {
@@ -970,11 +1929,13 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
           if (homeState is RiderHomeLoaded) {
             initialOrders = homeState.orders;
           }
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => RiderDeliveriesScreen(
-                riderId: widget.riderId,
-                initialOrders: initialOrders,
-              )));
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => RiderDeliveriesScreen(
+                        riderId: widget.riderId,
+                        initialOrders: initialOrders,
+                      )));
           return;
         }
         if (index == 3) {
@@ -983,11 +1944,13 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
           if (homeState is RiderHomeLoaded) {
             initialData = homeState.rider.toJson();
           }
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => RiderProfileScreen(
-                riderId: widget.riderId,
-                initialData: initialData,
-              )));
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => RiderProfileScreen(
+                        riderId: widget.riderId,
+                        initialData: initialData,
+                      )));
         }
       },
       items: const [

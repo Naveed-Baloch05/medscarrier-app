@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -117,6 +118,10 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
                 children: [
                   _buildProfileHeader(context, cs, isDark, loaded),
                   const SizedBox(height: 20),
+                  _sectionTitle('Pharmacy Code', cs),
+                  const SizedBox(height: 12),
+                  _buildPharmacyCodeCard(context, cs, isDark, loaded),
+                  const SizedBox(height: 22),
                   _sectionTitle('Pharmacy Information', cs),
                   const SizedBox(height: 12),
                   _buildInformationCard(context, cs, isDark, loaded),
@@ -146,6 +151,100 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
 
   Widget _sectionTitle(String title, ColorScheme cs) {
     return Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface));
+  }
+
+  Widget _buildPharmacyCodeCard(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state) {
+    final code = state.pharmacyCode.trim();
+    final hasCode = code.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF15301D) : const Color(0xFF0F7253).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.qr_code_rounded, size: 22, color: Color(0xFF0F7253)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Pharmacy Code', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Share this code with your riders to connect them to this pharmacy.',
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1D322A) : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Text(
+                    hasCode ? code : 'Pharmacy code unavailable',
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                      color: hasCode ? const Color(0xFF0F7253) : cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 46,
+                child: OutlinedButton.icon(
+                  onPressed: hasCode ? () => _copyPharmacyCode(state) : null,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Copy', style: TextStyle(fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F7253),
+                    side: BorderSide(color: isDark ? const Color(0xFF2A3A33) : Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyPharmacyCode(PharmacyProfileLoaded state) async {
+    final code = state.pharmacyCode.trim();
+    if (code.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pharmacy code copied')),
+      );
+    }
   }
 
   Widget _buildProfileHeader(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state) {
@@ -272,7 +371,16 @@ class _PharmacyProfileScreenState extends State<PharmacyProfileScreen> {
   }
 
   Widget _buildBusinessCard(BuildContext context, ColorScheme cs, bool isDark, PharmacyProfileLoaded state, bool isUpdating) {
+    final code = state.pharmacyCode.isNotEmpty ? state.pharmacyCode : 'N/A';
     return _sectionCard(context, cs, isDark, children: [
+      _informationRow(
+        icon: Icons.qr_code_rounded,
+        title: 'Pharmacy Code (for Riders)',
+        value: code,
+        cs: cs,
+        isDark: isDark,
+      ),
+      _divider(isDark),
       _informationRow(icon: Icons.badge_outlined, title: 'License Number', value: state.gphcNumber, cs: cs, isDark: isDark),
       _divider(isDark),
       _informationRow(icon: Icons.access_time_outlined, title: 'Opening Time', value: state.openingTime, cs: cs, isDark: isDark),

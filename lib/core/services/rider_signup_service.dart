@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'admin_notification_service.dart';
@@ -32,6 +31,56 @@ class RiderSignupService {
     }
   }
 
+  Future<Map<String, String>> validateAndResolvePharmacyCode(String code) async {
+    final clean = code.trim().toUpperCase();
+    if (clean.isEmpty) {
+      throw Exception('Invalid pharmacy code. Please check with your pharmacy.');
+    }
+
+    try {
+      // 1. Check pharmacies by pharmacyCode
+      final snap = await _firestore
+          .collection('pharmacies')
+          .where('pharmacyCode', isEqualTo: clean)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isNotEmpty) {
+        final doc = snap.docs.first;
+        final data = doc.data();
+        final name = (data['pharmacyName'] as String? ?? data['name'] as String? ?? 'Pharmacy').trim();
+        return {
+          'pharmacyId': doc.id,
+          'pharmacyName': name,
+          'pharmacyCode': clean,
+        };
+      }
+
+      // 2. Fallback check by gphcNumber
+      final gphcSnap = await _firestore
+          .collection('pharmacies')
+          .where('gphcNumber', isEqualTo: clean)
+          .limit(1)
+          .get();
+
+      if (gphcSnap.docs.isNotEmpty) {
+        final doc = gphcSnap.docs.first;
+        final data = doc.data();
+        final name = (data['pharmacyName'] as String? ?? data['name'] as String? ?? 'Pharmacy').trim();
+        return {
+          'pharmacyId': doc.id,
+          'pharmacyName': name,
+          'pharmacyCode': clean,
+        };
+      }
+    } catch (e) {
+      if (e.toString().contains('Invalid pharmacy code')) rethrow;
+      throw Exception('Failed to verify pharmacy code: $e');
+    }
+
+    throw Exception('Invalid pharmacy code. Please check with your pharmacy.');
+  }
+
   Future<RiderApplicationModel> submitApplication({
     required String fullName,
     required String email,
@@ -39,10 +88,17 @@ class RiderSignupService {
     required String vehicleType,
     required String vehicleReg,
     required String password,
+    required String pharmacyCode,
     File? licenseFront,
     File? licenseBack,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
+
+    // 0. Validate and resolve pharmacy code first before creating account
+    final resolvedPharmacy = await validateAndResolvePharmacyCode(pharmacyCode);
+    final pharmacyId = resolvedPharmacy['pharmacyId']!;
+    final pharmacyName = resolvedPharmacy['pharmacyName']!;
+    final cleanPharmacyCode = resolvedPharmacy['pharmacyCode']!;
 
     final duplicate = await emailExists(normalizedEmail);
     if (duplicate) {
@@ -104,6 +160,9 @@ class RiderSignupService {
         'phone': phone.trim(),
         'vehicleType': vehicleType,
         'vehicleRegistrationNumber': vehicleReg.trim(),
+        'pharmacyId': pharmacyId,
+        'pharmacyName': pharmacyName,
+        'pharmacyCode': cleanPharmacyCode,
         if (frontUrl != null) 'drivingLicenceFrontUrl': frontUrl,
         if (backUrl != null) 'drivingLicenceBackUrl': backUrl,
         'termsAccepted': true,
@@ -129,6 +188,8 @@ class RiderSignupService {
             'phone': phone.trim(),
             'vehicleType': vehicleType,
             'vehicleRegistrationNumber': vehicleReg.trim(),
+            'pharmacyId': pharmacyId,
+            'pharmacyName': pharmacyName,
             if (frontUrl != null) 'drivingLicenceFrontUrl': frontUrl,
             if (backUrl != null) 'drivingLicenceBackUrl': backUrl,
             'applicationId': applicationId,
@@ -143,6 +204,8 @@ class RiderSignupService {
             'phone': phone.trim(),
             'vehicleType': vehicleType,
             'vehicleReg': vehicleReg.trim(),
+            'pharmacyId': pharmacyId,
+            'pharmacyName': pharmacyName,
             'status': 'Pending',
             'active': false,
             'online': false,
@@ -176,6 +239,9 @@ class RiderSignupService {
           phone: phone.trim(),
           vehicleType: vehicleType,
           vehicleRegistrationNumber: vehicleReg.trim(),
+          pharmacyId: pharmacyId,
+          pharmacyName: pharmacyName,
+          pharmacyCode: cleanPharmacyCode,
           drivingLicenceFrontUrl: frontUrl,
           drivingLicenceBackUrl: backUrl,
           termsAccepted: true,

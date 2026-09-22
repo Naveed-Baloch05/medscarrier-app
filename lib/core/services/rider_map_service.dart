@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import '../../models/delivery_route_model.dart';
 import '../../models/order_model.dart';
+import '../../models/rider_live_location.dart';
 import '../../models/route_model.dart';
 import '../utils/route_utils.dart';
 import 'rider_delivery_details_service.dart';
@@ -26,6 +28,29 @@ class RiderMapSession {
     this.arrivedAt,
     this.pickupQrValue,
   });
+
+  /// Factory constructor to initialize map session from a batch delivery stop.
+  factory RiderMapSession.fromRouteStop(
+    RouteStopModel stop, {
+    LatLng? riderLocation,
+    String? riderId,
+    String? riderName,
+  }) {
+    return RiderMapSession(
+      order: stop.toOrderModel(),
+      customerName: stop.customerName,
+      customerAddress: stop.formattedAddress.isNotEmpty ? stop.formattedAddress : stop.address,
+      dropoffLat: stop.latitude,
+      dropoffLng: stop.longitude,
+      pharmacyName: stop.pharmacyName.isNotEmpty ? stop.pharmacyName : 'Pharmacy Hub',
+      pharmacyAddress: stop.pharmacyName,
+      riderId: riderId ?? stop.riderId,
+      riderName: riderName,
+      riderLat: riderLocation?.latitude,
+      riderLng: riderLocation?.longitude,
+      arrivedAt: stop.isDelivered ? (stop.deliveredAt ?? DateTime.now()) : null,
+    );
+  }
 
   final OrderModel order;
   final String? pharmacyName;
@@ -358,7 +383,7 @@ class RiderMapService {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
       'X-Goog-FieldMask':
-          'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs,routes.description,routes.warnings',
+          'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.description,routes.warnings,routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps.navigationInstruction,routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.startLocation,routes.legs.steps.endLocation,routes.legs.steps.polyline',
     };
 
     try {
@@ -476,6 +501,73 @@ class RiderMapService {
         'locationUpdatedAt': FieldValue.serverTimestamp(),
         'lastSeen': DateTime.now().toIso8601String(),
       });
+    } catch (_) {
+      // Non-critical background update failure ignored to prevent UI disruption
+    }
+  }
+
+  // ============================================================
+  // LIVE BATCH ROUTE TRACKING (rider_locations/{riderId})
+  // ============================================================
+
+  /// Persists the rider's live tracking snapshot to
+  /// `rider_locations/{riderId}` while delivering an active batch route.
+  /// Called throttled (time + distance) from the active delivery screen.
+  Future<void> updateRiderBatchLocation({
+    required String riderId,
+    required String pharmacyId,
+    required String routeId,
+    required double latitude,
+    required double longitude,
+    required int currentStopIndex,
+    required String currentOrderId,
+    required String currentCustomerName,
+    required String currentAddress,
+    required int totalStops,
+    required int deliveredCount,
+    required int failedCount,
+  }) async {
+    if (riderId.trim().isEmpty) return;
+
+    final location = RiderLiveLocation(
+      riderId: riderId.trim(),
+      pharmacyId: pharmacyId,
+      routeId: routeId,
+      latitude: latitude,
+      longitude: longitude,
+      currentStopIndex: currentStopIndex,
+      currentOrderId: currentOrderId,
+      currentCustomerName: currentCustomerName,
+      currentAddress: currentAddress,
+      totalStops: totalStops,
+      deliveredCount: deliveredCount,
+      failedCount: failedCount,
+      status: 'delivering',
+    );
+
+    try {
+      await _firestore
+          .collection('rider_locations')
+          .doc(location.riderId)
+          .set(location.toMap(), SetOptions(merge: true));
+    } catch (_) {
+      // Non-critical background update failure ignored to prevent UI disruption
+    }
+  }
+
+  /// Marks the live tracking document as complete/offline. The document is
+  /// never deleted so historical tracking data is preserved.
+  Future<void> stopRiderBatchTracking({
+    required String riderId,
+    bool completed = false,
+  }) async {
+    if (riderId.trim().isEmpty) return;
+
+    try {
+      await _firestore.collection('rider_locations').doc(riderId.trim()).set({
+        'status': completed ? 'completed' : 'offline',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (_) {
       // Non-critical background update failure ignored to prevent UI disruption
     }

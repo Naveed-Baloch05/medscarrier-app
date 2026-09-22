@@ -1637,7 +1637,7 @@ void _approveApplication(RiderApplicationModel app) {
         ),
         content: Text(
           'Approve ${app.fullName}\'s rider application? '
-          'This will enable their login account.',
+          'This will activate their login account and send an approval confirmation email.',
         ),
         actions: [
           TextButton(

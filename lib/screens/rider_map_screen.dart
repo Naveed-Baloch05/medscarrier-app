@@ -5,18 +5,30 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../bloc/rider_batch/rider_batch_bloc.dart';
+import '../bloc/rider_batch/rider_batch_event.dart';
+import '../bloc/rider_batch/rider_batch_state.dart';
 import '../bloc/rider_map/rider_map_bloc.dart';
 import '../bloc/rider_map/rider_map_event.dart';
 import '../bloc/rider_map/rider_map_state.dart';
 import '../core/services/rider_map_service.dart';
 import '../core/utils/route_utils.dart';
+import '../models/delivery_route_model.dart';
 import '../models/order_model.dart';
 
 class RiderMapScreen extends StatefulWidget {
-  const RiderMapScreen({super.key, this.riderId, this.initialOrderId});
+  const RiderMapScreen({
+    super.key,
+    this.riderId,
+    this.initialOrderId,
+    this.routeStop,
+    this.batchBloc,
+  });
 
   final String? riderId;
   final String? initialOrderId;
+  final RouteStopModel? routeStop;
+  final RiderBatchBloc? batchBloc;
 
   @override
   State<RiderMapScreen> createState() => _RiderMapScreenState();
@@ -34,6 +46,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   bool _isLoadingLocation = true;
   String? _locationError;
   bool _hasInitiallyFitMap = false;
+  bool _isAutoFollowingCamera = true;
 
   // Default fallback center
   static const LatLng _defaultLocation = LatLng(33.6844, 73.0479);
@@ -42,13 +55,21 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   void initState() {
     super.initState();
     _bloc = RiderMapBloc();
-    final orderId = widget.initialOrderId?.trim();
-    if (orderId != null && orderId.isNotEmpty) {
-      _bloc.add(SubscribeToOrder(orderId));
+
+    if (widget.routeStop != null) {
+      _bloc.add(InitializeStopNavigation(
+        widget.routeStop!,
+        riderId: widget.riderId,
+      ));
     } else {
-      final riderId = widget.riderId?.trim();
-      if (riderId != null && riderId.isNotEmpty) {
-        _bloc.add(SubscribeToMap(riderId));
+      final orderId = widget.initialOrderId?.trim();
+      if (orderId != null && orderId.isNotEmpty) {
+        _bloc.add(SubscribeToOrder(orderId));
+      } else {
+        final riderId = widget.riderId?.trim();
+        if (riderId != null && riderId.isNotEmpty) {
+          _bloc.add(SubscribeToMap(riderId));
+        }
       }
     }
 
@@ -127,6 +148,13 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
             _isLoadingLocation = false;
           });
           _bloc.add(RiderLocationUpdated(initialPosition));
+          if (widget.routeStop != null) {
+            _bloc.add(InitializeStopNavigation(
+              widget.routeStop!,
+              riderPosition: pos,
+              riderId: widget.riderId,
+            ));
+          }
           _fitMapToPoints();
         }
       } catch (_) {
@@ -138,16 +166,16 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       _positionSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 5,
+          distanceFilter: 3,
         ),
       ).listen(
         (position) {
           final pos = LatLng(position.latitude, position.longitude);
+          final heading = position.heading >= 0 ? position.heading : null;
           if (mounted) {
             setState(() {
               _currentRiderLocation = pos;
-              _currentHeading =
-                  position.heading >= 0 ? position.heading : null;
+              _currentHeading = heading;
               _isLoadingLocation = false;
             });
           }
@@ -156,6 +184,18 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           if (!_hasInitiallyFitMap) {
             _hasInitiallyFitMap = true;
             _fitMapToPoints();
+          } else if (_isAutoFollowingCamera && _mapController != null) {
+            // Dynamic 3D driving camera follow
+            _mapController!.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(
+                  target: pos,
+                  zoom: 17.5,
+                  bearing: heading ?? (_currentHeading ?? 0.0),
+                  tilt: 45.0,
+                ),
+              ),
+            );
           }
         },
         onError: (e) {
@@ -178,27 +218,35 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
   }
 
   Future<void> _recenterOnRider() async {
+    setState(() {
+      _isAutoFollowingCamera = true;
+    });
+
     if (_currentRiderLocation != null && _mapController != null) {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: _currentRiderLocation!,
-            zoom: 16.5,
+            zoom: 17.5,
             bearing: _currentHeading ?? 0.0,
-            tilt: 30.0,
+            tilt: 45.0,
           ),
         ),
       );
       if (mounted) {
-        _showMessage(context, 'Centered on your current location',
-            isError: false);
+        _showMessage(context, 'Following your location', isError: false);
       }
     } else {
       await _initLocation();
       if (_currentRiderLocation != null && _mapController != null) {
         await _mapController!.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: _currentRiderLocation!, zoom: 16.5),
+            CameraPosition(
+              target: _currentRiderLocation!,
+              zoom: 17.5,
+              bearing: _currentHeading ?? 0.0,
+              tilt: 45.0,
+            ),
           ),
         );
       } else if (mounted && _locationError != null) {
@@ -297,17 +345,62 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
       value: _bloc,
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
-        body: BlocListener<RiderMapBloc, RiderMapState>(
-          bloc: _bloc,
-          listener: (context, state) {
-            if (state is RiderMapOperationSuccess) {
-              _showMessage(context, state.message, isError: false);
-            } else if (state is RiderMapError && state.message.isNotEmpty) {
-              _showMessage(context, state.message, isError: true);
-            } else if (state is RiderMapLoaded && state.routeError != null) {
-              _showMessage(context, state.routeError!, isError: true);
-            }
-          },
+        body: MultiBlocListener(
+          listeners: [
+            BlocListener<RiderMapBloc, RiderMapState>(
+              bloc: _bloc,
+              listener: (context, state) {
+                if (state is RiderMapOperationSuccess) {
+                  _showMessage(context, state.message, isError: false);
+                  // If not batch mode, pop after single order completion
+                  if (widget.batchBloc == null && widget.routeStop != null) {
+                    Future.delayed(const Duration(milliseconds: 1200), () {
+                      if (mounted) {
+                        Navigator.of(this.context).maybePop();
+                      }
+                    });
+                  }
+                } else if (state is RiderMapError && state.message.isNotEmpty) {
+                  _showMessage(context, state.message, isError: true);
+                } else if (state is RiderMapLoaded && state.routeError != null) {
+                  _showMessage(context, state.routeError!, isError: true);
+                }
+              },
+            ),
+            if (widget.batchBloc != null)
+              BlocListener<RiderBatchBloc, RiderBatchState>(
+                bloc: widget.batchBloc!,
+                listener: (context, batchState) {
+                  if (batchState is RiderBatchActiveDelivery) {
+                    final nextStop = batchState.activeStop;
+                    if (nextStop != null &&
+                        nextStop.id != _sessionOf(_bloc.state)?.order.id) {
+                      // Automatically advance in-app navigation to the next stop
+                      setState(() {
+                        _signaturePoints.clear();
+                      });
+                      _bloc.add(AdvanceToNextBatchStop(
+                        nextStop,
+                        riderId: batchState.riderId,
+                      ));
+                      _showMessage(
+                        context,
+                        'Navigating to Stop #${nextStop.sequence}: ${nextStop.customerName}',
+                        isError: false,
+                      );
+                    }
+                  } else if (batchState is RiderBatchCompletedSummary) {
+                    // All batch stops are finished
+                    _showMessage(context, 'All route stops completed!', isError: false);
+                    Future.delayed(const Duration(milliseconds: 800), () {
+                      if (mounted) {
+                        Navigator.of(this.context).maybePop();
+                      }
+                    });
+                  }
+                },
+              ),
+          ],
           child: SafeArea(
             child: Stack(
               children: [
@@ -451,6 +544,14 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
               onMapCreated: (controller) {
                 _mapController = controller;
                 _fitMapToPoints();
+              },
+              onCameraMoveStarted: () {
+                // When rider manually touches/drags map, pause auto-follow
+                if (_isAutoFollowingCamera) {
+                  setState(() {
+                    _isAutoFollowingCamera = false;
+                  });
+                }
               },
               style: isDark ? _darkMapStyle : null,
               myLocationEnabled: _locationPermissionGranted,
@@ -836,7 +937,7 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 const SizedBox(height: 2),
                 Text(
                   maneuver != null
-                      ? 'In ${maneuver.distanceText} • Route: ${state.selectedRoute?.summary ?? "Fastest"}'
+                      ? 'In ${state.distanceToManeuverText} • Step ${state.currentStepIndex + 1}/${state.selectedRoute?.steps.length ?? 1}'
                       : (isPickupStage
                           ? 'Pickup: ${state.session.pharmacyAddressText}'
                           : 'Drop-off: ${state.session.customerAddressText}'),
@@ -1523,48 +1624,62 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
                 width: _signaturePoints.isNotEmpty ? 1.5 : 1,
               ),
             ),
-            child: _signaturePoints.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.draw_outlined,
-                            size: 28,
-                            color:
-                                cs.onSurfaceVariant.withValues(alpha: 0.4)),
-                        const SizedBox(height: 4),
-                        Text('Tap and draw to sign',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: cs.onSurfaceVariant
-                                    .withValues(alpha: 0.5))),
-                      ],
-                    ),
-                  )
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: GestureDetector(
-                      onPanStart: (details) {
-                        setState(() {
-                          _signaturePoints.add(details.localPosition);
-                        });
-                      },
-                      onPanUpdate: (details) {
-                        setState(() {
-                          _signaturePoints.add(details.localPosition);
-                        });
-                      },
-                      onPanEnd: (_) {
-                        setState(() {
-                          _signaturePoints.add(null);
-                        });
-                      },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (event) {
+                  if (!event.localPosition.dx.isFinite ||
+                      !event.localPosition.dy.isFinite) {
+                    return;
+                  }
+                  setState(() {
+                    _signaturePoints.add(event.localPosition);
+                  });
+                },
+                onPointerMove: (event) {
+                  if (!event.localPosition.dx.isFinite ||
+                      !event.localPosition.dy.isFinite) {
+                    return;
+                  }
+                  setState(() {
+                    _signaturePoints.add(event.localPosition);
+                  });
+                },
+                onPointerUp: (event) {
+                  setState(() {
+                    _signaturePoints.add(null);
+                  });
+                },
+                child: Stack(
+                  children: [
+                    Positioned.fill(
                       child: CustomPaint(
-                        size: Size.infinite,
                         painter: _SignaturePainter(points: _signaturePoints),
                       ),
                     ),
-                  ),
+                    if (_signaturePoints.isEmpty)
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.draw_outlined,
+                                size: 28,
+                                color: cs.onSurfaceVariant
+                                    .withValues(alpha: 0.4)),
+                            SizedBox(height: 4),
+                            Text('Tap and draw to sign',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant
+                                        .withValues(alpha: 0.5))),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
 
           if (_signaturePoints.isEmpty)
@@ -1581,32 +1696,201 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
 
           const SizedBox(height: 14),
 
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _signaturePoints.isEmpty
-                  ? null
-                  : () {
-                      _completeDelivery(context, session);
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F7253),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
-                disabledForegroundColor: Colors.grey,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+          Row(
+            children: [
+              if (widget.batchBloc != null) ...[
+                Expanded(
+                  flex: 1,
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showFailedDeliveryDialog(context, session),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade300, width: 1.2),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('Failed',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                flex: widget.batchBloc != null ? 2 : 1,
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _signaturePoints.isEmpty
+                        ? null
+                        : () {
+                            _completeDelivery(context, session);
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F7253),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
+                      disabledForegroundColor: Colors.grey,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.check_circle_outline, size: 19),
+                    label: const Text('Complete Delivery',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w800)),
+                  ),
+                ),
               ),
-              icon: const Icon(Icons.check_circle_outline, size: 19),
-              label: const Text('Complete Delivery',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w800)),
-            ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  void _showFailedDeliveryDialog(BuildContext context, RiderMapSession session) {
+    String selectedReason = 'Customer not available';
+    final noteController = TextEditingController();
+
+    final reasons = [
+      'Customer not available',
+      'Unable to access premises',
+      'Customer refused delivery',
+      'Wrong / incomplete address',
+      'Damaged medication package',
+      'Other reason',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final theme = Theme.of(context);
+            final isDark = theme.brightness == Brightness.dark;
+
+            return Container(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF131D18) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 22),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Record Delivery Failure',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Order for ${session.customer}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'REASON',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedReason,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1C2A22) : const Color(0xFFF2F5F3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    items: reasons
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13))))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setModalState(() => selectedReason = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'ADDITIONAL NOTE (OPTIONAL)',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: noteController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Add details for pharmacy return...',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1C2A22) : const Color(0xFFF2F5F3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(modalCtx);
+                        if (widget.batchBloc != null) {
+                          widget.batchBloc!.add(MarkActiveStopFailed(
+                            reason: selectedReason,
+                            note: noteController.text.trim().isNotEmpty
+                                ? noteController.text.trim()
+                                : null,
+                          ));
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Confirm Failure & Next Stop',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1621,6 +1905,9 @@ class _RiderMapScreenState extends State<RiderMapScreen> {
           signaturePoints: points,
           medicineHandoverConfirmed: true,
         ));
+    if (widget.routeStop != null && widget.batchBloc != null) {
+      widget.batchBloc!.add(MarkActiveStopDelivered(recipientName: session.customer));
+    }
   }
 
   void _showMessage(BuildContext context, String message,

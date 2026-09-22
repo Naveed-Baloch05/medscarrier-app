@@ -55,5 +55,52 @@ void main() {
       expect(RouteStepModel.formatDuration(480), '8 min');
       expect(RouteStepModel.formatDuration(3900), '1 hr 5 min');
     });
+
+    test('RouteStepModel parse duration and distance works', () {
+      expect(RouteStepModel.parseDurationSeconds('120s'), 120);
+      expect(RouteStepModel.parseDurationSeconds('3600s'), 3600);
+      expect(RouteStepModel.parseDurationSeconds('0s'), 0);
+    });
+
+    test('RouteModel step properties and maneuvers', () {
+      const step1 = RouteStepModel(
+        instruction: 'Turn left onto Oxford Rd',
+        distanceMeters: 300,
+        distanceText: '300 m',
+        durationText: '1 min',
+        maneuver: 'TURN_LEFT',
+        startLocation: LatLng(52.4862, -1.8904),
+        endLocation: LatLng(52.4870, -1.8920),
+      );
+      const step2 = RouteStepModel(
+        instruction: 'Turn right onto High St',
+        distanceMeters: 500,
+        distanceText: '500 m',
+        durationText: '2 min',
+        maneuver: 'TURN_RIGHT',
+        startLocation: LatLng(52.4870, -1.8920),
+        endLocation: LatLng(52.4900, -1.8920),
+      );
+
+      final route = RouteModel(
+        id: 'test_route_1',
+        points: const [
+          LatLng(52.4862, -1.8904),
+          LatLng(52.4870, -1.8920),
+          LatLng(52.4900, -1.8920),
+        ],
+        distanceMeters: 800,
+        distanceText: '800 m',
+        durationSeconds: 180,
+        durationText: '3 min',
+        summary: 'Via Oxford Rd',
+        steps: const [step1, step2],
+      );
+
+      expect(route.steps.length, 2);
+      expect(route.firstStep?.maneuver, 'TURN_LEFT');
+      expect(route.steps[1].maneuver, 'TURN_RIGHT');
+    });
   });
 }
+

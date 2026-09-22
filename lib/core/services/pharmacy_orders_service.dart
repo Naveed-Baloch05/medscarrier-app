@@ -24,7 +24,7 @@ class PharmacyOrdersService {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw Exception('No pharmacy user is currently logged in.');
+      return '';
     }
 
     return user.uid;
@@ -84,6 +84,10 @@ class PharmacyOrdersService {
       return value;
     }
 
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
     return null;
   }
 
@@ -101,6 +105,9 @@ class PharmacyOrdersService {
         : <String>[];
 
     final createdAt = _parseDateTime(data['createdAt']);
+    final assignedAt = _parseDateTime(data['assignedAt']);
+    final deliveredAt = _parseDateTime(data['deliveredAt']);
+    final failedAt = _parseDateTime(data['failedAt']);
 
     final rawMedicineCount = data['medicineCount'];
 
@@ -120,16 +127,37 @@ class PharmacyOrdersService {
         ? docId
         : '#ORD-$docId';
 
+    final dropoffLocation = data['dropoffLocation'];
+    double? dropoffLat = (data['dropoffLat'] ?? data['latitude'] as num?)?.toDouble();
+    double? dropoffLng = (data['dropoffLng'] ?? data['longitude'] as num?)?.toDouble();
+    if (dropoffLat == null && dropoffLocation is Map) {
+      dropoffLat = (dropoffLocation['lat'] ?? dropoffLocation['latitude'] as num?)?.toDouble();
+      dropoffLng = (dropoffLocation['lng'] ?? dropoffLocation['longitude'] as num?)?.toDouble();
+    }
+
     return PharmacyOrder(
       id: orderId,
+      rawId: docId,
       customerName: data['customerName']?.toString() ?? '',
+      customerPhone: data['customerPhone']?.toString() ?? '',
+      deliveryAddress: (data['dropoffAddress'] ?? data['deliveryAddress'])?.toString() ?? '',
       medicineCount: medicineCount,
       time: _formatTime(createdAt),
       status: data['status']?.toString() ?? 'New',
       totalAmount: (data['totalAmount'] as num?)?.toDouble() ?? 0.0,
       items: items,
+      riderId: data['riderId']?.toString() ?? '',
       riderName: data['riderName']?.toString() ?? '',
       riderPhone: data['riderPhone']?.toString() ?? '',
+      dropoffLat: dropoffLat,
+      dropoffLng: dropoffLng,
+      failureReason: data['failureReason']?.toString(),
+      failureNote: data['failureNote']?.toString(),
+      assignedAt: assignedAt,
+      deliveredAt: deliveredAt,
+      failedAt: failedAt,
+      controlledDrug: data['controlledDrug'] as bool? ?? false,
+      coldChain: data['coldChain'] as bool? ?? false,
     );
   }
 
@@ -152,11 +180,12 @@ class PharmacyOrdersService {
   }
 
   // ==============================================================
-  // GET PHARMACY ORDERS
+  // GET PHARMACY ORDERS (ONE-SHOT)
   // ==============================================================
 
   Future<List<PharmacyOrder>> getOrders(String pharmacyId) async {
     final currentPharmacyId = _getPharmacyId(pharmacyId);
+    if (currentPharmacyId.isEmpty) return [];
 
     final snapshot = await _firestore
         .collection('orders')
@@ -170,22 +199,47 @@ class PharmacyOrdersService {
         .map(_mapOrder)
         .toList();
 
-    // ------------------------------------------------------------
-    // ORDER PRIORITY
-    // ------------------------------------------------------------
+    _sortOrders(orders);
+    return orders;
+  }
+
+  // ==============================================================
+  // REAL-TIME PHARMACY ORDERS STREAM
+  // ==============================================================
+
+  Stream<List<PharmacyOrder>> pharmacyOrdersStream(String pharmacyId) {
+    final currentPharmacyId = _getPharmacyId(pharmacyId);
+    if (currentPharmacyId.isEmpty) {
+      return Stream.value([]);
+    }
+
+    return _firestore
+        .collection('orders')
+        .where('pharmacyId', isEqualTo: currentPharmacyId)
+        .snapshots()
+        .map((snapshot) {
+      final orders = snapshot.docs.map(_mapOrder).toList();
+      _sortOrders(orders);
+      return orders;
+    });
+  }
+
+  void _sortOrders(List<PharmacyOrder> orders) {
+    const statusOrder = {
+      'new': 0,
+      'preparing': 1,
+      'ready': 2,
+      'assigned': 3,
+      'picked up': 4,
+      'on the way': 5,
+      'arrived': 6,
+      'out for delivery': 7,
+      'delivered': 8,
+      'completed': 9,
+      'failed': 10,
+    };
 
     orders.sort((a, b) {
-      const statusOrder = {
-        'new': 0,
-        'preparing': 1,
-        'ready': 2,
-        'assigned': 3,
-        'picked up': 4,
-        'on the way': 5,
-        'delivered': 6,
-        'completed': 7,
-      };
-
       final aIndex =
           statusOrder[a.status.toLowerCase()] ?? 99;
 
@@ -194,8 +248,6 @@ class PharmacyOrdersService {
 
       return aIndex.compareTo(bIndex);
     });
-
-    return orders;
   }
 
   // ==============================================================
@@ -211,16 +263,11 @@ class PharmacyOrdersService {
     String deliveryAddress = '',
     double? deliveryLat,
     double? deliveryLng,
+    String customerPhone = '',
+    bool controlledDrug = false,
+    bool coldChain = false,
   }) async {
     final currentPharmacyId = _getPharmacyId(pharmacyId);
-
-    // ------------------------------------------------------------
-    // CLIENT DELIVERY LOCATION
-    // Stored on the order so the rider map can use it as the
-    // destination. The existing Rider Map reads `dropoffAddress`,
-    // and `dropoffLat`/`dropoffLng` (or `dropoffLocation`) from the
-    // order document.
-    // ------------------------------------------------------------
 
     final locationData = <String, dynamic>{
       'deliveryAddress': deliveryAddress,
@@ -234,32 +281,24 @@ class PharmacyOrdersService {
 
     final docRef = await _firestore.collection('orders').add({
       'pharmacyId': currentPharmacyId,
-
       'customerName': customerName,
-
+      'customerPhone': customerPhone,
       'medicineCount': medicineCount,
-
       'status': status,
-
       'totalAmount': totalAmount,
-
       'items': <String>[],
-
       'dropoffAddress': deliveryAddress,
-
+      'controlledDrug': controlledDrug,
+      'coldChain': coldChain,
       ...locationData,
-
       'riderId': null,
       'riderName': '',
       'riderPhone': '',
-
       'createdAt': FieldValue.serverTimestamp(),
-
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
     final doc = await docRef.get();
-
     return _mapOrder(doc);
   }
 
@@ -318,6 +357,7 @@ class PharmacyOrdersService {
     required String newStatus,
     String riderName = '',
     String riderPhone = '',
+    String riderId = '',
   }) async {
     final docId = _docIdFromOrder(id);
 
@@ -330,10 +370,6 @@ class PharmacyOrdersService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    // ------------------------------------------------------------
-    // RIDER INFORMATION
-    // ------------------------------------------------------------
-
     if (riderName.trim().isNotEmpty) {
       updateData['riderName'] = riderName.trim();
     }
@@ -342,19 +378,21 @@ class PharmacyOrdersService {
       updateData['riderPhone'] = riderPhone.trim();
     }
 
-    // ------------------------------------------------------------
-    // STATUS TIMESTAMPS
-    // ------------------------------------------------------------
+    if (riderId.trim().isNotEmpty) {
+      updateData['riderId'] = riderId.trim();
+    }
 
     if (newStatus.toLowerCase() == 'assigned') {
-      updateData['assignedAt'] =
-          FieldValue.serverTimestamp();
+      updateData['assignedAt'] = FieldValue.serverTimestamp();
     }
 
     if (newStatus.toLowerCase() == 'delivered' ||
         newStatus.toLowerCase() == 'completed') {
-      updateData['deliveredAt'] =
-          FieldValue.serverTimestamp();
+      updateData['deliveredAt'] = FieldValue.serverTimestamp();
+    }
+
+    if (newStatus.toLowerCase() == 'failed') {
+      updateData['failedAt'] = FieldValue.serverTimestamp();
     }
 
     await _firestore

@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import '../../models/pharmacy_application_model.dart';
 import 'admin_notification_service.dart';
+import 'email_service.dart';
 
 class AdminPharmacyService {
   AdminPharmacyService._();
@@ -193,6 +194,11 @@ class AdminPharmacyService {
       'uid': uid,
     });
 
+    final existingCode = (data['pharmacyCode'] as String? ?? '').trim();
+    final pharmacyCode = existingCode.isNotEmpty
+        ? existingCode
+        : _generatePharmacyCode(data['pharmacyName'] as String? ?? 'PHARM');
+
     batch.set(
       _pharmacies.doc(uid),
       {
@@ -205,6 +211,7 @@ class AdminPharmacyService {
         'phone': data['phone'] ?? '',
         'businessAddress': data['businessAddress'] ?? '',
         'gphcNumber': data['gphcNumber'] ?? '',
+        'pharmacyCode': pharmacyCode,
         'licenseDocumentUrl': data['licenseDocumentUrl'] ?? '',
         'status': 'Approved',
         'active': true,
@@ -224,6 +231,7 @@ class AdminPharmacyService {
         'email': email,
         'phone': data['phone'] ?? '',
         'role': 'pharmacy',
+        'pharmacyCode': pharmacyCode,
         'accountStatus': 'active',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -234,13 +242,18 @@ class AdminPharmacyService {
     await batch.commit();
 
     if (email.isNotEmpty) {
-      await _sendPasswordResetEmail(email);
+      await EmailService.instance.sendPharmacyApprovalEmail(
+        email: email,
+        pharmacyName: pharmacyName,
+        uid: uid,
+      );
     }
 
     try {
       await AdminNotificationService.instance.createNotification(
         title: 'Pharmacy Application Approved',
-        body: '$pharmacyName has been approved and a password setup link was sent to $email.',
+        body:
+            '$pharmacyName has been approved and an approval confirmation email was sent to $email.',
         type: 'pharmacy',
         referenceId: applicationId,
       );
@@ -266,19 +279,6 @@ class AdminPharmacyService {
       return null;
     } catch (_) {
       return null;
-    }
-  }
-
-  Future<void> _sendPasswordResetEmail(String email) async {
-    try {
-      final secondaryApp = await _getSecondaryApp();
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-      await secondaryAuth.sendPasswordResetEmail(email: email);
-      await secondaryAuth.signOut();
-    } catch (_) {
-      try {
-        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      } catch (_) {}
     }
   }
 
@@ -326,5 +326,12 @@ class AdminPharmacyService {
         referenceId: applicationId,
       );
     } catch (_) {}
+  }
+
+  String _generatePharmacyCode(String pharmacyName) {
+    final cleanName = pharmacyName.replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
+    final prefix = cleanName.length >= 3 ? cleanName.substring(0, 3) : cleanName.padRight(3, 'X');
+    final randomDigits = (1000 + (DateTime.now().microsecondsSinceEpoch % 9000)).toString();
+    return '$prefix-$randomDigits';
   }
 }

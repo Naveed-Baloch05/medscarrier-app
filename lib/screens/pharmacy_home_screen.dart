@@ -5,9 +5,6 @@ import '../bloc/pharmacy_home/pharmacy_home_bloc.dart';
 import '../bloc/pharmacy_home/pharmacy_home_event.dart';
 import '../bloc/pharmacy_home/pharmacy_home_state.dart';
 
-import '../bloc/pharmacy_medicines/pharmacy_medicines_bloc.dart';
-import '../bloc/pharmacy_medicines/pharmacy_medicines_event.dart';
-
 import '../bloc/pharmacy_notifications/pharmacy_notifications_bloc.dart';
 import '../bloc/pharmacy_notifications/pharmacy_notifications_event.dart';
 
@@ -23,10 +20,13 @@ import '../widgets/pharmacy_order_summary.dart';
 import '../widgets/pharmacy_active_order_card.dart';
 import '../widgets/pharmacy_bottom_nav.dart';
 
+import 'pharmacy_live_tracking_screen.dart';
 import 'pharmacy_orders_screen.dart';
-import 'pharmacy_medicines_screen.dart';
+import 'pharmacy_history_screen.dart';
 import 'pharmacy_profile_screen.dart';
 import 'pharmacy_notifications_screen.dart';
+import '../core/services/pharmacy_tracking_service.dart';
+import '../models/delivery_route_model.dart';
 
 class PharmacyHomeScreen extends StatelessWidget {
   const PharmacyHomeScreen({
@@ -63,17 +63,6 @@ class PharmacyHomeScreen extends StatelessWidget {
           create: (_) => PharmacyOrdersBloc()
             ..add(
               LoadPharmacyOrders(pharmacyId),
-            ),
-        ),
-
-        // ----------------------------------------------------------
-        // PHARMACY MEDICINES
-        // ----------------------------------------------------------
-
-        BlocProvider(
-          create: (_) => PharmacyMedicinesBloc()
-            ..add(
-              LoadPharmacyMedicines(pharmacyId),
             ),
         ),
 
@@ -200,7 +189,7 @@ class _PharmacyHomeViewState
         return const PharmacyOrdersScreen();
 
       case 2:
-        return PharmacyMedicinesScreen(
+        return PharmacyHistoryScreen(
           pharmacyId: widget.pharmacyId,
         );
 
@@ -328,10 +317,9 @@ class _PharmacyHomeViewState
                           homeState
                               .pharmacy
                               .pharmacyName,
-                          pharmacyCode:
-                          homeState
-                              .pharmacy
-                              .gphcNumber,
+                          pharmacyCode: homeState.pharmacy.pharmacyCode.isNotEmpty
+                              ? homeState.pharmacy.pharmacyCode
+                              : homeState.pharmacy.gphcNumber,
                           onNotificationTap: () {
                             Navigator.push(
                               context,
@@ -401,6 +389,12 @@ class _PharmacyHomeViewState
                             );
                           },
                         ),
+                        const SizedBox(height: 16),
+
+                        // ------------------------------------------------
+                        // LIVE ROUTE TRACKING
+                        // ------------------------------------------------
+                        _buildLiveRouteTrackingCard(context),
 
                         const SizedBox(height: 20),
 
@@ -709,7 +703,7 @@ class _PharmacyHomeViewState
                                     _mapStatus(
                                       order.status,
                                     ),
-                                    location: '',
+                                    location: order.deliveryAddress,
                                     tags:
                                     _extractTags(
                                       order,
@@ -733,13 +727,27 @@ class _PharmacyHomeViewState
                                           .riderName,
                                     ),
                                     driverStatus:
-                                    order
-                                        .riderName
-                                        .isNotEmpty
-                                        ? 'Collecting now'
+                                    order.riderName.isNotEmpty
+                                        ? (order.isInTransit
+                                            ? 'Out for delivery • Tap to track'
+                                            : 'Assigned • Tap to track')
                                         : '',
                                     onTap: () {
-                                      _openOrdersScreen();
+                                      if (order.canTrackLive) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => PharmacyLiveTrackingScreen(
+                                              pharmacyId: widget.pharmacyId,
+                                              riderId: order.riderId,
+                                              riderName: order.riderName,
+                                              initialOrderId: order.docId,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        _openOrdersScreen();
+                                      }
                                     },
                                   ),
                                 );
@@ -858,23 +866,33 @@ class _PharmacyHomeViewState
       ) {
     final tags = <String>[];
 
+    if (order.controlledDrug) {
+      tags.add('CD');
+    }
+
+    if (order.coldChain) {
+      tags.add('2-8°C');
+    }
+
     final lowerItems = order.items
         .map(
           (item) => item.toLowerCase(),
     )
         .join(' ');
 
-    if (lowerItems.contains('codeine') ||
-        lowerItems.contains('tramadol') ||
-        lowerItems.contains('morphine') ||
-        lowerItems.contains('naproxen') ||
-        lowerItems.contains('co-codamol')) {
+    if (!tags.contains('CD') &&
+        (lowerItems.contains('codeine') ||
+            lowerItems.contains('tramadol') ||
+            lowerItems.contains('morphine') ||
+            lowerItems.contains('naproxen') ||
+            lowerItems.contains('co-codamol'))) {
       tags.add('CD');
     }
 
-    if (lowerItems.contains('insulin') ||
-        lowerItems.contains('injection') ||
-        lowerItems.contains('inhaler')) {
+    if (!tags.contains('2-8°C') &&
+        (lowerItems.contains('insulin') ||
+            lowerItems.contains('injection') ||
+            lowerItems.contains('inhaler'))) {
       tags.add('2-8°C');
     }
 
@@ -925,5 +943,148 @@ class _PharmacyHomeViewState
       default:
         return null;
     }
+  }
+
+  // ==============================================================
+  // LIVE ROUTE TRACKING CARD
+  // ==============================================================
+
+  Widget _buildLiveRouteTrackingCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return StreamBuilder<DeliveryRouteModel?>(
+      stream: PharmacyTrackingService().activeRouteForPharmacyStream(
+        pharmacyId: widget.pharmacyId,
+      ),
+      builder: (context, snapshot) {
+        final route = snapshot.data;
+        final hasActiveRoute = route != null && route.isActive;
+
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PharmacyLiveTrackingScreen(
+                  pharmacyId: widget.pharmacyId,
+                  routeId: route?.id,
+                  riderId: route?.riderId ?? '',
+                  riderName: route?.riderName ?? '',
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: hasActiveRoute
+                  ? (isDark
+                      ? const Color(0xFF15301D)
+                      : Colors.green.shade50)
+                  : Theme.of(context).cardColor,
+              border: Border.all(
+                color: hasActiveRoute
+                    ? (isDark
+                        ? const Color(0xFF1D322A)
+                        : Colors.green.shade200)
+                    : (isDark
+                        ? const Color(0xFF1D322A)
+                        : Colors.grey.shade200),
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: hasActiveRoute
+                        ? const Color(0xFF0F7253)
+                        : (isDark
+                            ? const Color(0xFF1D322A)
+                            : Colors.grey.shade100),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.two_wheeler_rounded,
+                    color: hasActiveRoute ? Colors.white : cs.onSurfaceVariant,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Live Route Tracking',
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          if (hasActiveRoute) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F7253),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'ACTIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        hasActiveRoute
+                            ? 'Rider: ${route.riderName.isNotEmpty ? route.riderName : "Assigned Rider"} • ${route.deliveredCount}/${route.totalStops} stops completed'
+                            : 'Monitor live rider positions & delivery sequence',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: cs.onSurfaceVariant,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

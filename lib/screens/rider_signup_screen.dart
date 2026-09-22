@@ -28,6 +28,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _pharmacyCodeController = TextEditingController();
   final _vehicleRegController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -38,6 +39,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _pharmacyCodeController.dispose();
     _vehicleRegController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -98,6 +100,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
           fullName: _fullNameController.text.trim(),
           email: _emailController.text.trim(),
           phone: _phoneController.text.trim(),
+          pharmacyCode: _pharmacyCodeController.text.trim().toUpperCase(),
           vehicleType: _selectedVehicle,
           vehicleReg: _vehicleRegController.text.trim(),
           password: _passwordController.text,
@@ -393,6 +396,17 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                     validator: (v) => _validateRequired(v, 'Phone number'),
                                   ),
 
+                                  SizedBox(height: 12 * scale),
+
+                                  _buildCustomTextField(
+                                    controller: _pharmacyCodeController,
+                                    hintText: 'Enter Pharmacy Code (e.g. ABC-4821)',
+                                    icon: Icons.local_pharmacy_outlined,
+                                    textCapitalization: TextCapitalization.characters,
+                                    isDark: isDark,
+                                    validator: (v) => _validateRequired(v, 'Pharmacy code'),
+                                  ),
+
                                   SizedBox(height: 20 * scale),
 
                                   _buildVehicleTypeSelector(scale, isDark),
@@ -675,6 +689,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
     bool isPassword = false,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    TextCapitalization textCapitalization = TextCapitalization.none,
     String? Function(String?)? validator,
     Widget? suffixIcon,
   }) {
@@ -685,6 +700,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
       controller: controller,
       obscureText: isPassword ? obscureText : false,
       keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
       validator: validator,
       style: TextStyle(
         color: isDark ? const Color(0xFFD1DDD7) : const Color(0xFF191C1B),

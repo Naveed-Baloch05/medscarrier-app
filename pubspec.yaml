@@ -48,10 +48,15 @@ dependencies:
   geolocator: ^14.0.3
   google_maps_flutter_android: ^2.19.10
   google_maps_flutter_platform_interface: ^2.16.1
+  url_launcher: ^6.3.2
+  google_mlkit_text_recognition: ^0.16.0
+  camera: ^0.12.0+2
+  image: ^4.5.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.3
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -100,3 +105,15 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# ============================================================
+# Application launcher icons (generated from the official logo)
+# Run: dart run flutter_launcher_icons
+# ============================================================
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.png"

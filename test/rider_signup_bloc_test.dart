@@ -15,6 +15,7 @@ void main() {
         fullName: 'John Rider',
         email: 'john@test.com',
         phone: '07123456789',
+        pharmacyCode: 'ABC-1234',
         vehicleType: 'Bike',
         vehicleReg: 'AB12 CDE',
         password: 'password123',
@@ -22,6 +23,7 @@ void main() {
       expect(event.fullName, 'John Rider');
       expect(event.email, 'john@test.com');
       expect(event.phone, '07123456789');
+      expect(event.pharmacyCode, 'ABC-1234');
       expect(event.vehicleType, 'Bike');
       expect(event.vehicleReg, 'AB12 CDE');
       expect(event.password, 'password123');
@@ -36,6 +38,7 @@ void main() {
         fullName: 'John Rider',
         email: 'john@test.com',
         phone: '07123456789',
+        pharmacyCode: 'ABC-1234',
         vehicleType: 'Bike',
         vehicleRegistrationNumber: 'AB12 CDE',
         status: 'pending',

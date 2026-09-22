@@ -9,6 +9,7 @@ class PharmacyModel {
     required this.phone,
     required this.businessAddress,
     required this.gphcNumber,
+    this.pharmacyCode = '',
     this.status = 'Pending',
     this.active = false,
     this.licenseDocumentUrl,
@@ -22,6 +23,7 @@ class PharmacyModel {
   final String phone;
   final String businessAddress;
   final String gphcNumber;
+  final String pharmacyCode;
   final String status;
   final bool active;
   final String? licenseDocumentUrl;
@@ -35,6 +37,7 @@ class PharmacyModel {
         'phone': phone,
         'businessAddress': businessAddress,
         'gphcNumber': gphcNumber,
+        'pharmacyCode': pharmacyCode,
         'status': status,
         'active': active,
         'licenseDocumentUrl': licenseDocumentUrl,
@@ -54,6 +57,7 @@ class PharmacyModel {
       phone: json['phone'] as String? ?? '',
       businessAddress: json['businessAddress'] as String? ?? json['address'] as String? ?? '',
       gphcNumber: json['gphcNumber'] as String? ?? json['licenseNumber'] as String? ?? '',
+      pharmacyCode: json['pharmacyCode'] as String? ?? json['code'] as String? ?? '',
       status: json['status'] as String? ?? 'Pending',
       active: json['active'] as bool? ?? false,
       licenseDocumentUrl: json['licenseDocumentUrl'] as String? ??

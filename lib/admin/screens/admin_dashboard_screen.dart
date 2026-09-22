@@ -1312,7 +1312,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         content: Text(
-          'Approve ${pharmacy.pharmacyName}? This will activate their pharmacy account and send an email to ${pharmacy.email.isNotEmpty ? pharmacy.email : "their email"} with a link to create their password.',
+          'Approve ${pharmacy.pharmacyName}? This will activate their pharmacy account and send an approval confirmation email to ${pharmacy.email.isNotEmpty ? pharmacy.email : "their email"}.',
           style: TextStyle(
             color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
           ),
@@ -1429,7 +1429,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         content: Text(
-          'Approve ${rider.fullName}? This will activate their rider account and send an email to ${rider.email.isNotEmpty ? rider.email : "their email"} with approval details.',
+          'Approve ${rider.fullName}? This will activate their rider account and send an approval confirmation email to ${rider.email.isNotEmpty ? rider.email : "their email"}.',
           style: TextStyle(
             color: isDark ? const Color(0xFF8B9B94) : const Color(0xFF6E7A75),
           ),

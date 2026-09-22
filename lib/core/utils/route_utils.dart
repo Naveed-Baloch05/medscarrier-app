@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../models/order_model.dart';
 
 class RouteUtils {
   RouteUtils._();
@@ -116,6 +117,112 @@ class RouteUtils {
   }
 
   static double _toRadians(double degrees) => degrees * (math.pi / 180.0);
+
+  /// Optimizes a list of delivery orders starting from [origin] using
+  /// Nearest Neighbor + 2-Opt TSP heuristic.
+  static List<OrderModel> optimizeOrderSequence({
+    required LatLng origin,
+    required List<OrderModel> orders,
+  }) {
+    if (orders.length <= 1) return List.from(orders);
+
+    // Filter orders with valid dropoff coordinates
+    final withCoords = <OrderModel>[];
+    final withoutCoords = <OrderModel>[];
+
+    for (final order in orders) {
+      if (order.hasDropoffCoordinates) {
+        withCoords.add(order);
+      } else {
+        withoutCoords.add(order);
+      }
+    }
+
+    if (withCoords.isEmpty) {
+      return List.from(orders);
+    }
+
+    // Step 1: Nearest Neighbor Heuristic
+    final unvisited = List<OrderModel>.from(withCoords);
+    final route = <OrderModel>[];
+    LatLng current = origin;
+
+    while (unvisited.isNotEmpty) {
+      int nearestIndex = 0;
+      double minDistance = double.infinity;
+
+      for (int i = 0; i < unvisited.length; i++) {
+        final dest = unvisited[i].dropoffLatLng!;
+        final dist = distanceMeters(current, dest);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestIndex = i;
+        }
+      }
+
+      final nearest = unvisited.removeAt(nearestIndex);
+      route.add(nearest);
+      current = nearest.dropoffLatLng!;
+    }
+
+    // Step 2: 2-Opt Optimization for further path reduction
+    if (route.length >= 3) {
+      bool improved = true;
+      int iterations = 0;
+      const maxIterations = 50;
+
+      while (improved && iterations < maxIterations) {
+        improved = false;
+        iterations++;
+
+        for (int i = 0; i < route.length - 1; i++) {
+          for (int k = i + 1; k < route.length; k++) {
+            final pPrev = i == 0 ? origin : route[i - 1].dropoffLatLng!;
+            final pI = route[i].dropoffLatLng!;
+            final pK = route[k].dropoffLatLng!;
+            final pNext = (k + 1 < route.length) ? route[k + 1].dropoffLatLng : null;
+
+            final currentDist = distanceMeters(pPrev, pI) +
+                (pNext != null ? distanceMeters(pK, pNext) : 0);
+
+            final newDist = distanceMeters(pPrev, pK) +
+                (pNext != null ? distanceMeters(pI, pNext) : 0);
+
+            if (newDist < currentDist - 1.0) {
+              // Reverse sub-array between i and k
+              final sub = route.sublist(i, k + 1).reversed.toList();
+              route.replaceRange(i, k + 1, sub);
+              improved = true;
+            }
+          }
+        }
+      }
+    }
+
+    // Append any orders without coordinates at the end
+    route.addAll(withoutCoords);
+    return route;
+  }
+
+  /// Calculates total cumulative distance in meters across route stops
+  static double totalRouteDistance({
+    required LatLng origin,
+    required List<OrderModel> orderedStops,
+  }) {
+    if (orderedStops.isEmpty) return 0.0;
+
+    double total = 0.0;
+    LatLng current = origin;
+
+    for (final stop in orderedStops) {
+      if (stop.dropoffLatLng != null) {
+        total += distanceMeters(current, stop.dropoffLatLng!);
+        current = stop.dropoffLatLng!;
+      }
+    }
+
+    return total;
+  }
 
   /// Maps maneuver strings returned by Google Routes API to an icon.
   static IconData getManeuverIcon(String? maneuver) {

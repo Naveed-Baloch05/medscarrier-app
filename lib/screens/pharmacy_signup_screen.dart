@@ -278,7 +278,7 @@ class _PharmacySignupScreenState extends State<PharmacySignupScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Your approval request has been sent to the admin for approval. Once approved, you will receive an email with a link to create your password and log into your account.',
+                                    'Your approval request has been sent to the admin for approval. Once approved, you will receive an email confirmation and can log into your account using your registered email address and password.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 13,

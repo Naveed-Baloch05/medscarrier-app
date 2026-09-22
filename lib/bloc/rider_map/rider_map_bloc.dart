@@ -14,12 +14,14 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
         super(const RiderMapInitial()) {
     on<SubscribeToMap>(_onSubscribe);
     on<SubscribeToOrder>(_onSubscribeOrder);
+    on<InitializeStopNavigation>(_onInitializeStopNavigation);
     on<LoadMapOrder>(_onLoad);
     on<RiderLocationUpdated>(_onRiderLocationUpdated);
     on<SelectRoute>(_onSelectRoute);
     on<RecalculateRoute>(_onRecalculateRoute);
     on<MarkArrived>(_onMarkArrived);
     on<CompleteDelivery>(_onCompleteDelivery);
+    on<AdvanceToNextBatchStop>(_onAdvanceToNextBatchStop);
   }
 
   final RiderMapService _service;
@@ -31,6 +33,10 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
   double? _currentHeading;
   List<RouteModel> _routes = [];
   int _selectedRouteIndex = 0;
+  int _currentStepIndex = 0;
+  int _distanceToNextManeuverMeters = 0;
+  int? _liveRemainingDistanceMeters;
+  int? _liveRemainingDurationSeconds;
   bool _isComputingRoute = false;
 
   // Throttling markers for Firestore & Routes API
@@ -123,6 +129,40 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
         ));
       }
     });
+  }
+
+  Future<void> _onInitializeStopNavigation(
+    InitializeStopNavigation event,
+    Emitter<RiderMapState> emit,
+  ) async {
+    emit(const RiderMapLoading());
+    await _mapSubscription?.cancel();
+
+    if (event.riderPosition != null) {
+      _currentPosition = event.riderPosition;
+    }
+
+    final session = RiderMapSession.fromRouteStop(
+      event.stop,
+      riderLocation: _currentPosition,
+      riderId: event.riderId,
+    );
+
+    _latestSession = session;
+    _lastIsPickedUp = session.isPickedUp;
+    _lastDestination = session.currentDestination;
+    _selectedRouteIndex = 0;
+    _currentStepIndex = 0;
+    _distanceToNextManeuverMeters = 0;
+    _liveRemainingDistanceMeters = null;
+    _liveRemainingDurationSeconds = null;
+    _routes = [];
+
+    _emitLoaded(emit);
+
+    if (session.currentDestination != null && _currentPosition != null) {
+      add(const RecalculateRoute(force: true));
+    }
   }
 
   Future<void> _onLoad(
@@ -228,6 +268,37 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
             ? _routes[_selectedRouteIndex]
             : _routes.first;
         offRoute = RouteUtils.isOffRoute(pos, activeRoute.points, thresholdMeters: 50.0);
+
+        // Turn-by-Turn Maneuver progression:
+        if (activeRoute.steps.isNotEmpty) {
+          // Advance through passed steps
+          while (_currentStepIndex < activeRoute.steps.length - 1) {
+            final step = activeRoute.steps[_currentStepIndex];
+            final stepEnd = step.endLocation;
+            if (stepEnd != null) {
+              final distToEnd = RouteUtils.distanceMeters(pos, stepEnd);
+              // Rider is within 25m of the maneuver point or has passed it
+              if (distToEnd <= 25.0) {
+                _currentStepIndex++;
+                continue;
+              }
+            }
+            break;
+          }
+
+          // Calculate distance to current maneuver's end waypoint
+          final activeStep = activeRoute.steps[_currentStepIndex];
+          final stepTarget = activeStep.endLocation ?? dest;
+          _distanceToNextManeuverMeters = RouteUtils.distanceMeters(pos, stepTarget).round();
+        } else {
+          _distanceToNextManeuverMeters = distToDest.round();
+        }
+
+        // Live remaining distance & ETA along remaining route
+        final remainingDist = _computeRemainingDistance(pos, activeRoute.points, dest);
+        _liveRemainingDistanceMeters = remainingDist.round();
+        // Compute ETA based on speed: ~30 km/h (8.33 m/s)
+        _liveRemainingDurationSeconds = (_liveRemainingDistanceMeters! / 8.33).round();
       } else if (!_isComputingRoute) {
         add(const RecalculateRoute(force: true));
       }
@@ -245,12 +316,35 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
     }
   }
 
+  /// Estimates the remaining route distance from [current] location through the remainder of [points] to [dest].
+  double _computeRemainingDistance(LatLng current, List<LatLng> points, LatLng dest) {
+    if (points.isEmpty) return RouteUtils.distanceMeters(current, dest);
+
+    // Find the closest point index on the polyline
+    int closestIndex = 0;
+    double minDistance = double.infinity;
+    for (int i = 0; i < points.length; i++) {
+      final d = RouteUtils.distanceMeters(current, points[i]);
+      if (d < minDistance) {
+        minDistance = d;
+        closestIndex = i;
+      }
+    }
+
+    double distance = minDistance;
+    for (int i = closestIndex; i < points.length - 1; i++) {
+      distance += RouteUtils.distanceMeters(points[i], points[i + 1]);
+    }
+    return distance;
+  }
+
   void _onSelectRoute(
     SelectRoute event,
     Emitter<RiderMapState> emit,
   ) {
     if (event.routeIndex >= 0 && event.routeIndex < _routes.length) {
       _selectedRouteIndex = event.routeIndex;
+      _currentStepIndex = 0;
       _emitLoaded(emit);
     }
   }
@@ -292,6 +386,19 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
 
       _routes = calculatedRoutes;
       _selectedRouteIndex = 0;
+      _currentStepIndex = 0;
+      if (_routes.isNotEmpty && _routes.first.steps.isNotEmpty) {
+        final firstStep = _routes.first.steps.first;
+        final target = firstStep.endLocation ?? destination;
+        _distanceToNextManeuverMeters = RouteUtils.distanceMeters(origin, target).round();
+        _liveRemainingDistanceMeters = _routes.first.distanceMeters;
+        _liveRemainingDurationSeconds = _routes.first.durationSeconds;
+      } else {
+        final dist = RouteUtils.distanceMeters(origin, destination).round();
+        _distanceToNextManeuverMeters = dist;
+        _liveRemainingDistanceMeters = dist;
+        _liveRemainingDurationSeconds = (dist / 8.33).round();
+      }
       _isComputingRoute = false;
 
       _emitLoaded(emit, isLoadingRoute: false, isOffRoute: false);
@@ -324,7 +431,39 @@ class RiderMapBloc extends Bloc<RiderMapEvent, RiderMapState> {
       isLoadingRoute: isLoadingRoute ?? false,
       routeError: routeError,
       isNearDestination: isNearDestination ?? (state is RiderMapLoaded ? (state as RiderMapLoaded).isNearDestination : false),
+      currentStepIndex: _currentStepIndex,
+      distanceToNextManeuverMeters: _distanceToNextManeuverMeters,
+      liveRemainingDistanceMeters: _liveRemainingDistanceMeters,
+      liveRemainingDurationSeconds: _liveRemainingDurationSeconds,
     ));
+  }
+
+  Future<void> _onAdvanceToNextBatchStop(
+    AdvanceToNextBatchStop event,
+    Emitter<RiderMapState> emit,
+  ) async {
+    final nextSession = RiderMapSession.fromRouteStop(
+      event.nextStop,
+      riderLocation: _currentPosition,
+      riderId: event.riderId ?? _latestSession?.riderId,
+      riderName: _latestSession?.riderName,
+    );
+
+    _latestSession = nextSession;
+    _lastIsPickedUp = nextSession.isPickedUp;
+    _lastDestination = nextSession.currentDestination;
+    _selectedRouteIndex = 0;
+    _currentStepIndex = 0;
+    _distanceToNextManeuverMeters = 0;
+    _liveRemainingDistanceMeters = null;
+    _liveRemainingDurationSeconds = null;
+    _routes = [];
+
+    _emitLoaded(emit);
+
+    if (nextSession.currentDestination != null && _currentPosition != null) {
+      add(const RecalculateRoute(force: true));
+    }
   }
 
   Future<void> _onMarkArrived(
